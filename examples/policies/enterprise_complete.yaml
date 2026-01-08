@@ -1,0 +1,775 @@
+# =============================================================================
+# Enterprise Complete Policy
+# =============================================================================
+#
+# This is a comprehensive enterprise policy that combines multiple policy
+# patterns into a production-ready configuration for large organizations.
+#
+# Use Case:
+#   This policy demonstrates a complete enterprise AI governance setup
+#   suitable for organizations with:
+#   - Multiple departments with different access levels
+#   - Strict compliance requirements (GDPR, HIPAA, SOC 2)
+#   - Cost management and budget controls
+#   - Security and data protection requirements
+#   - Global operations across time zones
+#
+# Policy Structure:
+#   1. Security & Compliance (Highest Priority, 400-500)
+#   2. Data Protection (Priority 300-399)
+#   3. Department Access (Priority 200-299)
+#   4. Cost Controls (Priority 150-199)
+#   5. Model & Capability Rules (Priority 100-149)
+#   6. Default Handling (Priority 1-99)
+#
+# Prerequisites:
+#   - Model registry populated with approved deployments
+#   - User directory integration for department/role lookup
+#   - Data classification system in place
+#   - Cost tracking and budget system configured
+#   - Audit logging enabled
+#
+# Deployment Notes:
+#   - Review all rules before deploying to production
+#   - Customize department names and thresholds
+#   - Update compliance contacts
+#   - Test with representative request samples
+#
+# =============================================================================
+
+name: enterprise-complete-policy
+version: "2.0.0"
+description: Comprehensive enterprise AI governance policy
+
+metadata:
+  author: ai-governance-team
+  created: "2024-01-01"
+  last_review: "2024-01-15"
+  next_review: "2024-04-15"
+  compliance_frameworks:
+    - GDPR
+    - HIPAA
+    - SOC2
+    - NIST-AI-RMF
+    - EU-AI-Act
+  contacts:
+    compliance: compliance@company.com
+    security: security@company.com
+    ai_platform: ai-platform@company.com
+  documentation: https://internal.company.com/ai-policies
+
+# Variables for easy customization
+variables:
+  # Cost thresholds
+  max_single_request_cost: 5.00
+  high_cost_threshold: 1.00
+  audit_cost_threshold: 0.10
+
+  # Rate limits
+  user_requests_per_hour: 100
+  expensive_model_per_hour: 20
+  batch_requests_per_minute: 50
+
+  # Budget thresholds
+  daily_user_budget: 50.00
+  monthly_dept_budget: 10000.00
+
+# =============================================================================
+# SECTION 1: SECURITY & COMPLIANCE RULES (Priority 400-500)
+# =============================================================================
+# These rules ALWAYS take precedence. They cannot be overridden.
+
+rules:
+  # -------------------------------------------------------------------------
+  # 1.1 Absolute Blocks - Never Allow
+  # -------------------------------------------------------------------------
+
+  - name: sec-001-deny-blocked-users
+    description: |
+      SECURITY: Block all requests from suspended or terminated users.
+      This is a security control that cannot be bypassed.
+    action: DENY
+    priority: 500
+    match_conditions:
+      user_status:
+        in:
+          - suspended
+          - terminated
+          - blocked
+    tags:
+      - security
+      - absolute-block
+      - user-status
+
+  - name: sec-002-deny-phi-all
+    description: |
+      HIPAA COMPLIANCE: Protected Health Information must never be sent
+      to any AI model. No exceptions. Violation is a compliance breach.
+    action: DENY
+    priority: 500
+    match_conditions:
+      data_classification:
+        contains: phi
+    tags:
+      - compliance
+      - hipaa
+      - phi
+      - absolute-block
+
+  - name: sec-003-deny-pci-all
+    description: |
+      PCI-DSS COMPLIANCE: Payment card data must never be sent to AI models.
+      No exceptions. Violation is a compliance breach.
+    action: DENY
+    priority: 500
+    match_conditions:
+      data_classification:
+        contains: pci
+    tags:
+      - compliance
+      - pci-dss
+      - absolute-block
+
+  - name: sec-004-deny-during-incident
+    description: |
+      SECURITY: During active security incidents, AI services are restricted.
+      Only critical operations are allowed during lockdown.
+    action: DENY
+    priority: 500
+    match_conditions:
+      security_incident_active: true
+      use_case:
+        not_in:
+          - security-monitoring
+          - incident-response
+    tags:
+      - security
+      - incident-response
+      - lockdown
+
+  - name: sec-005-deny-unregistered-deployments
+    description: |
+      EU AI ACT: All AI deployments must be registered before use.
+      Requests to unregistered deployments are blocked.
+    action: DENY
+    priority: 480
+    match_conditions:
+      deployment_status:
+        not_in:
+          - registered
+          - approved
+    tags:
+      - compliance
+      - eu-ai-act
+      - registration
+
+  # -------------------------------------------------------------------------
+  # 1.2 High-Risk Deployment Controls
+  # -------------------------------------------------------------------------
+
+  - name: sec-010-require-approval-critical
+    description: |
+      Critical risk deployments require executive approval for each request.
+      This provides maximum oversight for high-impact AI uses.
+    action: REQUIRE_APPROVAL
+    priority: 470
+    match_conditions:
+      risk_level: critical
+    tags:
+      - compliance
+      - high-risk
+      - approval-required
+
+  - name: sec-011-require-approval-high-risk
+    description: |
+      High-risk deployments require management approval.
+      This ensures human oversight for significant AI decisions.
+    action: REQUIRE_APPROVAL
+    priority: 460
+    match_conditions:
+      risk_level: high
+      approval_status:
+        not_in:
+          - approved
+    tags:
+      - compliance
+      - high-risk
+      - approval-required
+
+  - name: sec-012-audit-high-risk-all
+    description: |
+      All high-risk deployment requests are logged for audit.
+      Required for compliance reporting.
+    action: AUDIT
+    priority: 450
+    match_conditions:
+      risk_level:
+        in:
+          - high
+          - critical
+    tags:
+      - compliance
+      - audit
+      - high-risk
+
+# =============================================================================
+# SECTION 2: DATA PROTECTION RULES (Priority 300-399)
+# =============================================================================
+
+  # -------------------------------------------------------------------------
+  # 2.1 PII Handling
+  # -------------------------------------------------------------------------
+
+  - name: data-001-deny-pii-public-api
+    description: |
+      GDPR/CCPA: PII can only be processed by enterprise endpoints
+      with Data Processing Agreements in place.
+    action: DENY
+    priority: 380
+    match_conditions:
+      data_classification:
+        contains: pii
+      model:
+        not_in:
+          - gpt-4-enterprise
+          - claude-3-enterprise
+          - azure-openai-gpt4
+    tags:
+      - compliance
+      - gdpr
+      - pii
+
+  - name: data-002-allow-pii-enterprise
+    description: |
+      Allow PII processing on enterprise endpoints with proper controls.
+    action: ALLOW
+    priority: 370
+    match_conditions:
+      data_classification:
+        contains: pii
+      model:
+        in:
+          - gpt-4-enterprise
+          - claude-3-enterprise
+          - azure-openai-gpt4
+    tags:
+      - compliance
+      - gdpr
+      - pii
+      - enterprise
+
+  - name: data-003-audit-pii-requests
+    description: |
+      All PII requests are logged for GDPR compliance demonstration.
+    action: AUDIT
+    priority: 360
+    match_conditions:
+      data_classification:
+        contains: pii
+    tags:
+      - compliance
+      - gdpr
+      - audit
+
+  # -------------------------------------------------------------------------
+  # 2.2 Confidential Data
+  # -------------------------------------------------------------------------
+
+  - name: data-010-deny-confidential-cheap
+    description: |
+      Confidential data cannot be processed by budget models.
+      These may have different data retention policies.
+    action: DENY
+    priority: 350
+    match_conditions:
+      data_classification:
+        contains: confidential
+      model:
+        in:
+          - gpt-3.5-turbo
+          - claude-3-haiku
+          - gpt-4o-mini
+    tags:
+      - data-protection
+      - confidential
+
+  - name: data-011-allow-confidential-premium
+    description: |
+      Confidential data can be processed by premium models
+      with enterprise data handling.
+    action: ALLOW
+    priority: 340
+    match_conditions:
+      data_classification:
+        contains: confidential
+      model:
+        in:
+          - gpt-4
+          - gpt-4-turbo
+          - gpt-4-enterprise
+          - claude-3-opus
+          - claude-3-sonnet
+    tags:
+      - data-protection
+      - confidential
+      - approved
+
+  # -------------------------------------------------------------------------
+  # 2.3 Classification Requirements
+  # -------------------------------------------------------------------------
+
+  - name: data-020-require-classification
+    description: |
+      All requests must include data classification.
+      Unclassified requests are rejected.
+    action: DENY
+    priority: 320
+    match_conditions:
+      data_classification:
+        equals: null
+    tags:
+      - compliance
+      - classification-required
+
+# =============================================================================
+# SECTION 3: DEPARTMENT ACCESS RULES (Priority 200-299)
+# =============================================================================
+
+  # -------------------------------------------------------------------------
+  # 3.1 Engineering - Full Access
+  # -------------------------------------------------------------------------
+
+  - name: dept-001-engineering-full
+    description: |
+      Engineering department has full access to all approved models
+      for development, testing, and production use.
+    action: ALLOW
+    priority: 280
+    match_conditions:
+      department: engineering
+      provider:
+        in:
+          - openai
+          - anthropic
+          - google
+    tags:
+      - department
+      - engineering
+      - full-access
+
+  # -------------------------------------------------------------------------
+  # 3.2 Data Science - Advanced Access
+  # -------------------------------------------------------------------------
+
+  - name: dept-010-data-science-advanced
+    description: |
+      Data Science has access to powerful models for analytics and ML.
+    action: ALLOW
+    priority: 280
+    match_conditions:
+      department: data-science
+      model:
+        in:
+          - gpt-4
+          - gpt-4-turbo
+          - gpt-4o
+          - claude-3-opus
+          - claude-3-sonnet
+          - text-embedding-3-large
+    tags:
+      - department
+      - data-science
+
+  # -------------------------------------------------------------------------
+  # 3.3 Research - Experimental Access
+  # -------------------------------------------------------------------------
+
+  - name: dept-020-research-experimental
+    description: |
+      Research can access experimental and preview models for evaluation.
+    action: ALLOW
+    priority: 280
+    match_conditions:
+      department: research
+      provider:
+        in:
+          - openai
+          - anthropic
+          - google
+    tags:
+      - department
+      - research
+      - experimental
+
+  # -------------------------------------------------------------------------
+  # 3.4 Finance - Cost-Controlled
+  # -------------------------------------------------------------------------
+
+  - name: dept-030-finance-limited
+    description: |
+      Finance has access to cost-effective models only.
+    action: ALLOW
+    priority: 280
+    match_conditions:
+      department: finance
+      model:
+        in:
+          - gpt-3.5-turbo
+          - gpt-4o-mini
+          - claude-3-haiku
+    tags:
+      - department
+      - finance
+      - cost-controlled
+
+  - name: dept-031-finance-deny-expensive
+    description: |
+      Finance is explicitly denied access to expensive models.
+    action: DENY
+    priority: 290
+    match_conditions:
+      department: finance
+      model:
+        in:
+          - gpt-4
+          - gpt-4-turbo
+          - claude-3-opus
+    tags:
+      - department
+      - finance
+      - cost-control
+
+  # -------------------------------------------------------------------------
+  # 3.5 Legal - Controlled Access
+  # -------------------------------------------------------------------------
+
+  - name: dept-040-legal-approved
+    description: |
+      Legal has access to capable models for contract and document analysis.
+    action: ALLOW
+    priority: 280
+    match_conditions:
+      department: legal
+      model:
+        in:
+          - gpt-4
+          - gpt-4-turbo
+          - claude-3-opus
+          - claude-3-sonnet
+    tags:
+      - department
+      - legal
+
+  # -------------------------------------------------------------------------
+  # 3.6 HR - Basic Access
+  # -------------------------------------------------------------------------
+
+  - name: dept-050-hr-basic
+    description: |
+      HR has basic access for document processing and communication.
+    action: ALLOW
+    priority: 280
+    match_conditions:
+      department: hr
+      model:
+        in:
+          - gpt-3.5-turbo
+          - gpt-4o-mini
+          - claude-3-haiku
+    tags:
+      - department
+      - hr
+      - basic
+
+  # -------------------------------------------------------------------------
+  # 3.7 Marketing - Content Focus
+  # -------------------------------------------------------------------------
+
+  - name: dept-060-marketing-content
+    description: |
+      Marketing has access to content generation models.
+    action: ALLOW
+    priority: 280
+    match_conditions:
+      department: marketing
+      model:
+        in:
+          - gpt-4
+          - gpt-4o
+          - gpt-3.5-turbo
+          - claude-3-sonnet
+          - claude-3-haiku
+    tags:
+      - department
+      - marketing
+      - content
+
+  - name: dept-061-marketing-deny-code
+    description: |
+      Marketing cannot use code generation features.
+    action: DENY
+    priority: 290
+    match_conditions:
+      department: marketing
+      use_case:
+        in:
+          - code-generation
+          - code-review
+    tags:
+      - department
+      - marketing
+      - restricted
+
+  # -------------------------------------------------------------------------
+  # 3.8 Contractors - Restricted with Audit
+  # -------------------------------------------------------------------------
+
+  - name: dept-070-contractor-audit
+    description: |
+      All contractor requests are audited.
+    action: AUDIT
+    priority: 270
+    match_conditions:
+      department: contractors
+    tags:
+      - department
+      - contractors
+      - audit
+
+  - name: dept-071-contractor-limited
+    description: |
+      Contractors have limited access to basic models only.
+    action: ALLOW
+    priority: 260
+    match_conditions:
+      department: contractors
+      model:
+        in:
+          - gpt-3.5-turbo
+          - claude-3-haiku
+    tags:
+      - department
+      - contractors
+      - limited
+
+# =============================================================================
+# SECTION 4: COST CONTROLS (Priority 150-199)
+# =============================================================================
+
+  # -------------------------------------------------------------------------
+  # 4.1 Hard Cost Limits
+  # -------------------------------------------------------------------------
+
+  - name: cost-001-deny-excessive
+    description: |
+      Block single requests estimated over $5.00.
+      These require special approval.
+    action: DENY
+    priority: 190
+    match_conditions:
+      estimated_cost:
+        gt: ${max_single_request_cost}
+    tags:
+      - cost-control
+      - excessive
+
+  - name: cost-002-require-approval-high
+    description: |
+      Requests over $1.00 require approval.
+    action: REQUIRE_APPROVAL
+    priority: 185
+    match_conditions:
+      estimated_cost:
+        gt: ${high_cost_threshold}
+    tags:
+      - cost-control
+      - approval-required
+
+  # -------------------------------------------------------------------------
+  # 4.2 Rate Limiting
+  # -------------------------------------------------------------------------
+
+  - name: cost-010-rate-limit-user
+    description: |
+      Limit each user to 100 requests per hour.
+    action: RATE_LIMIT
+    priority: 170
+    action_params:
+      limit: ${user_requests_per_hour}
+      period: hour
+      key: user_id
+    match_conditions: {}
+    tags:
+      - cost-control
+      - rate-limit
+
+  - name: cost-011-rate-limit-expensive
+    description: |
+      Stricter rate limits for expensive models.
+    action: RATE_LIMIT
+    priority: 175
+    action_params:
+      limit: ${expensive_model_per_hour}
+      period: hour
+      key: user_id
+    match_conditions:
+      model:
+        in:
+          - gpt-4
+          - gpt-4-turbo
+          - claude-3-opus
+    tags:
+      - cost-control
+      - rate-limit
+      - expensive
+
+  # -------------------------------------------------------------------------
+  # 4.3 Cost Auditing
+  # -------------------------------------------------------------------------
+
+  - name: cost-020-audit-significant
+    description: |
+      Audit all requests over $0.10 for cost optimization review.
+    action: AUDIT
+    priority: 160
+    match_conditions:
+      estimated_cost:
+        gt: ${audit_cost_threshold}
+    tags:
+      - cost-control
+      - audit
+
+# =============================================================================
+# SECTION 5: MODEL & CAPABILITY RULES (Priority 100-149)
+# =============================================================================
+
+  # -------------------------------------------------------------------------
+  # 5.1 Vision/Multimodal Controls
+  # -------------------------------------------------------------------------
+
+  - name: model-001-deny-vision-unapproved
+    description: |
+      Vision capabilities require special approval.
+    action: DENY
+    priority: 140
+    match_conditions:
+      input_type: image
+      vision_approved: false
+    tags:
+      - capability
+      - vision
+      - approval-required
+
+  # -------------------------------------------------------------------------
+  # 5.2 Deprecated Model Blocks
+  # -------------------------------------------------------------------------
+
+  - name: model-010-deny-deprecated
+    description: |
+      Block deprecated models. Migrate to current versions.
+    action: DENY
+    priority: 140
+    match_conditions:
+      model:
+        in:
+          - text-davinci-003
+          - text-davinci-002
+          - gpt-3
+    tags:
+      - deprecated
+      - migration
+
+  # -------------------------------------------------------------------------
+  # 5.3 Beta/Preview Controls
+  # -------------------------------------------------------------------------
+
+  - name: model-020-deny-beta-production
+    description: |
+      Beta models not allowed in production.
+    action: DENY
+    priority: 140
+    match_conditions:
+      model:
+        pattern: ".*-preview$|.*-beta$"
+      environment: production
+    tags:
+      - beta
+      - non-production
+
+  # -------------------------------------------------------------------------
+  # 5.4 Standard Model Approvals
+  # -------------------------------------------------------------------------
+
+  - name: model-030-allow-standard
+    description: |
+      Standard approved models for general use.
+    action: ALLOW
+    priority: 120
+    match_conditions:
+      model:
+        in:
+          - gpt-4
+          - gpt-4-turbo
+          - gpt-4o
+          - gpt-4o-mini
+          - gpt-3.5-turbo
+          - claude-3-opus
+          - claude-3-sonnet
+          - claude-3-haiku
+          - claude-3-5-sonnet
+    tags:
+      - approved
+      - standard
+
+# =============================================================================
+# SECTION 6: DEFAULT HANDLING (Priority 1-99)
+# =============================================================================
+
+  # -------------------------------------------------------------------------
+  # 6.1 Allow Public Data
+  # -------------------------------------------------------------------------
+
+  - name: default-001-allow-public
+    description: |
+      Public data with approved providers is allowed.
+    action: ALLOW
+    priority: 80
+    match_conditions:
+      data_classification:
+        contains: public
+      provider:
+        in:
+          - openai
+          - anthropic
+    tags:
+      - default
+      - public
+
+  # -------------------------------------------------------------------------
+  # 6.2 Universal Audit
+  # -------------------------------------------------------------------------
+
+  - name: default-010-audit-all
+    description: |
+      All requests are logged for audit trail.
+    action: AUDIT
+    priority: 10
+    match_conditions: {}
+    tags:
+      - audit
+      - compliance
+
+  # -------------------------------------------------------------------------
+  # 6.3 Default Deny
+  # -------------------------------------------------------------------------
+
+  - name: default-999-deny-all
+    description: |
+      Default deny for any request not matching an allow rule.
+      This implements secure-by-default posture.
+    action: DENY
+    priority: 1
+    match_conditions: {}
+    tags:
+      - default
+      - secure-by-default

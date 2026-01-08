@@ -1,0 +1,72 @@
+[
+  {
+    "description": "Public data request",
+    "request": {
+      "provider": "openai",
+      "model": "gpt-4",
+      "user_id": "user-001",
+      "data_classification": ["public"]
+    },
+    "expected_decision": "ALLOW"
+  },
+  {
+    "description": "Confidential data with GPT-4",
+    "request": {
+      "provider": "openai",
+      "model": "gpt-4",
+      "user_id": "user-002",
+      "data_classification": ["confidential"]
+    },
+    "expected_decision": "ALLOW"
+  },
+  {
+    "description": "Confidential data with GPT-3.5 (may be denied)",
+    "request": {
+      "provider": "openai",
+      "model": "gpt-3.5-turbo",
+      "user_id": "user-003",
+      "data_classification": ["confidential"]
+    },
+    "expected_decision": "DENY"
+  },
+  {
+    "description": "PII data with non-enterprise model (should be denied)",
+    "request": {
+      "provider": "openai",
+      "model": "gpt-4",
+      "user_id": "user-004",
+      "data_classification": ["pii"]
+    },
+    "expected_decision": "DENY"
+  },
+  {
+    "description": "PII data with enterprise model",
+    "request": {
+      "provider": "openai",
+      "model": "gpt-4-enterprise",
+      "user_id": "user-005",
+      "data_classification": ["pii"]
+    },
+    "expected_decision": "ALLOW"
+  },
+  {
+    "description": "PHI data (always denied)",
+    "request": {
+      "provider": "openai",
+      "model": "gpt-4-enterprise",
+      "user_id": "user-006",
+      "data_classification": ["phi"]
+    },
+    "expected_decision": "DENY"
+  },
+  {
+    "description": "Mixed classification with PHI (denied)",
+    "request": {
+      "provider": "openai",
+      "model": "gpt-4",
+      "user_id": "user-007",
+      "data_classification": ["public", "phi"]
+    },
+    "expected_decision": "DENY"
+  }
+]

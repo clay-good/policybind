@@ -1,0 +1,28 @@
+# Basic Policy Fixture
+# A simple policy for testing basic enforcement scenarios
+
+name: basic-test-policy
+version: "1.0.0"
+description: Basic policy for testing
+
+rules:
+  - name: allow-gpt-4
+    description: Allow GPT-4 model access
+    action: ALLOW
+    priority: 100
+    match_conditions:
+      model: gpt-4
+
+  - name: allow-gpt-35
+    description: Allow GPT-3.5-turbo model access
+    action: ALLOW
+    priority: 100
+    match_conditions:
+      model: gpt-3.5-turbo
+
+  - name: deny-dall-e
+    description: Deny DALL-E image models
+    action: DENY
+    priority: 100
+    match_conditions:
+      model: dall-e-3

@@ -1,0 +1,434 @@
+# =============================================================================
+# Time-Based Policy
+# =============================================================================
+#
+# This example demonstrates time-of-day and calendar-based restrictions
+# for AI model usage.
+#
+# Use Case:
+#   - Restrict expensive models to business hours
+#   - Allow batch processing only during off-peak hours
+#   - Block non-essential AI usage during maintenance windows
+#   - Implement weekend restrictions for cost control
+#   - Handle holiday and special event periods
+#   - Support multiple time zones for global teams
+#
+# Time Condition Formats:
+#   - hour: 0-23 (24-hour format)
+#   - day_of_week: monday, tuesday, ..., sunday
+#   - date: YYYY-MM-DD format
+#   - time_range: HH:MM-HH:MM
+#
+# Prerequisites:
+#   - System clock must be synchronized (NTP)
+#   - Time zone should be configured correctly
+#   - Business hours should align with organizational policy
+#
+# =============================================================================
+
+name: time-based-policy
+version: "1.0.0"
+description: Time-of-day and calendar-based AI usage restrictions
+
+metadata:
+  author: operations-team
+  created: "2024-01-01"
+  timezone: UTC
+  business_hours: "09:00-18:00"
+  maintenance_window: "Sunday 02:00-06:00 UTC"
+
+# =============================================================================
+# Rules Section
+# =============================================================================
+
+rules:
+  # -------------------------------------------------------------------------
+  # Maintenance Windows (Highest Priority)
+  # -------------------------------------------------------------------------
+
+  - name: block-during-maintenance
+    description: |
+      Block all AI requests during scheduled maintenance windows.
+      Maintenance occurs every Sunday from 02:00-06:00 UTC.
+      This ensures system stability during updates.
+    action: DENY
+    priority: 500
+    match_conditions:
+      time:
+        day_of_week: sunday
+        hour:
+          in:
+            - 2
+            - 3
+            - 4
+            - 5
+    tags:
+      - maintenance
+      - scheduled-downtime
+
+  - name: block-emergency-maintenance
+    description: |
+      Block all AI requests during emergency maintenance.
+      This is triggered by setting the emergency_maintenance flag.
+    action: DENY
+    priority: 500
+    match_conditions:
+      emergency_maintenance: true
+    tags:
+      - maintenance
+      - emergency
+
+  # -------------------------------------------------------------------------
+  # Business Hours Restrictions
+  # -------------------------------------------------------------------------
+
+  - name: deny-expensive-models-after-hours
+    description: |
+      Expensive models (GPT-4, Claude Opus) are only available during
+      business hours (09:00-18:00 local time, Monday-Friday).
+      This controls costs and ensures human oversight is available.
+    action: DENY
+    priority: 300
+    match_conditions:
+      model:
+        in:
+          - gpt-4
+          - gpt-4-turbo
+          - claude-3-opus
+      time:
+        hour:
+          not_in:
+            - 9
+            - 10
+            - 11
+            - 12
+            - 13
+            - 14
+            - 15
+            - 16
+            - 17
+    tags:
+      - business-hours
+      - cost-control
+      - expensive-models
+
+  - name: deny-expensive-models-weekends
+    description: |
+      Expensive models are not available on weekends unless
+      explicitly approved for weekend work.
+    action: DENY
+    priority: 300
+    match_conditions:
+      model:
+        in:
+          - gpt-4
+          - gpt-4-turbo
+          - claude-3-opus
+      time:
+        day_of_week:
+          in:
+            - saturday
+            - sunday
+      weekend_approved: false
+    tags:
+      - business-hours
+      - weekend
+      - cost-control
+
+  - name: allow-weekend-approved-users
+    description: |
+      Users with weekend approval can use expensive models
+      on weekends for critical work.
+    action: ALLOW
+    priority: 310
+    match_conditions:
+      weekend_approved: true
+      time:
+        day_of_week:
+          in:
+            - saturday
+            - sunday
+    tags:
+      - weekend
+      - approved
+
+  # -------------------------------------------------------------------------
+  # Off-Peak Processing
+  # -------------------------------------------------------------------------
+
+  - name: allow-batch-processing-night
+    description: |
+      Batch processing jobs can use AI models during off-peak hours
+      (22:00-06:00) at reduced priority. This is more cost-effective.
+    action: ALLOW
+    priority: 200
+    match_conditions:
+      use_case: batch-processing
+      time:
+        hour:
+          in:
+            - 22
+            - 23
+            - 0
+            - 1
+            - 2
+            - 3
+            - 4
+            - 5
+    tags:
+      - off-peak
+      - batch-processing
+
+  - name: rate-limit-batch-peak-hours
+    description: |
+      Batch processing during peak hours is rate-limited to
+      ensure interactive users have priority.
+    action: RATE_LIMIT
+    priority: 200
+    action_params:
+      limit: 10
+      period: minute
+      key: source_application
+    match_conditions:
+      use_case: batch-processing
+      time:
+        hour:
+          in:
+            - 9
+            - 10
+            - 11
+            - 12
+            - 13
+            - 14
+            - 15
+            - 16
+            - 17
+    tags:
+      - peak-hours
+      - rate-limit
+      - batch-processing
+
+  # -------------------------------------------------------------------------
+  # Holiday and Special Event Handling
+  # -------------------------------------------------------------------------
+
+  - name: restrict-during-holidays
+    description: |
+      During company holidays, only essential AI services are available.
+      Non-essential use is blocked to reduce costs and support burden.
+    action: DENY
+    priority: 400
+    match_conditions:
+      company_holiday: true
+      use_case:
+        not_in:
+          - customer-support
+          - security-monitoring
+          - critical-operations
+    tags:
+      - holiday
+      - reduced-service
+
+  - name: allow-essential-during-holidays
+    description: |
+      Essential services remain available during holidays.
+      These include customer support and security operations.
+    action: ALLOW
+    priority: 410
+    match_conditions:
+      company_holiday: true
+      use_case:
+        in:
+          - customer-support
+          - security-monitoring
+          - critical-operations
+    tags:
+      - holiday
+      - essential-services
+
+  # -------------------------------------------------------------------------
+  # End of Month/Quarter Restrictions
+  # -------------------------------------------------------------------------
+
+  - name: audit-end-of-month-usage
+    description: |
+      Increase scrutiny on AI usage during the last 3 days of each month.
+      This helps with budget management and cost allocation.
+    action: AUDIT
+    priority: 150
+    match_conditions:
+      time:
+        day_of_month:
+          in:
+            - 29
+            - 30
+            - 31
+    tags:
+      - end-of-month
+      - budget
+      - audit
+
+  - name: restrict-end-of-quarter
+    description: |
+      During quarter-end close periods (last 5 days of quarter),
+      new experimental AI use cases require approval.
+    action: REQUIRE_APPROVAL
+    priority: 250
+    match_conditions:
+      quarter_end_period: true
+      use_case_type: experimental
+    tags:
+      - end-of-quarter
+      - approval-required
+
+  # -------------------------------------------------------------------------
+  # Time Zone Specific Rules
+  # -------------------------------------------------------------------------
+
+  - name: allow-apac-business-hours
+    description: |
+      APAC region teams can use AI during their business hours
+      (00:00-09:00 UTC = 09:00-18:00 SGT/HKT).
+    action: ALLOW
+    priority: 200
+    match_conditions:
+      region: apac
+      time:
+        hour:
+          in:
+            - 0
+            - 1
+            - 2
+            - 3
+            - 4
+            - 5
+            - 6
+            - 7
+            - 8
+    tags:
+      - regional
+      - apac
+      - business-hours
+
+  - name: allow-emea-business-hours
+    description: |
+      EMEA region teams can use AI during their business hours
+      (08:00-17:00 UTC).
+    action: ALLOW
+    priority: 200
+    match_conditions:
+      region: emea
+      time:
+        hour:
+          in:
+            - 8
+            - 9
+            - 10
+            - 11
+            - 12
+            - 13
+            - 14
+            - 15
+            - 16
+    tags:
+      - regional
+      - emea
+      - business-hours
+
+  - name: allow-americas-business-hours
+    description: |
+      Americas region teams can use AI during their business hours
+      (14:00-23:00 UTC = 09:00-18:00 EST).
+    action: ALLOW
+    priority: 200
+    match_conditions:
+      region: americas
+      time:
+        hour:
+          in:
+            - 14
+            - 15
+            - 16
+            - 17
+            - 18
+            - 19
+            - 20
+            - 21
+            - 22
+    tags:
+      - regional
+      - americas
+      - business-hours
+
+  # -------------------------------------------------------------------------
+  # Default Allow During Business Hours
+  # -------------------------------------------------------------------------
+
+  - name: allow-business-hours-default
+    description: |
+      Allow standard model access during core business hours (09:00-18:00 UTC)
+      for approved use cases.
+    action: ALLOW
+    priority: 100
+    match_conditions:
+      time:
+        hour:
+          in:
+            - 9
+            - 10
+            - 11
+            - 12
+            - 13
+            - 14
+            - 15
+            - 16
+            - 17
+      provider:
+        in:
+          - openai
+          - anthropic
+    tags:
+      - business-hours
+      - default-allow
+
+  - name: allow-cost-effective-anytime
+    description: |
+      Cost-effective models are available 24/7 for basic tasks.
+    action: ALLOW
+    priority: 50
+    match_conditions:
+      model:
+        in:
+          - gpt-3.5-turbo
+          - claude-3-haiku
+          - gpt-4o-mini
+    tags:
+      - cost-effective
+      - always-available
+
+  # -------------------------------------------------------------------------
+  # Default Deny After Hours
+  # -------------------------------------------------------------------------
+
+  - name: deny-after-hours-default
+    description: |
+      Default deny for unclassified requests outside business hours.
+      This ensures only approved after-hours usage occurs.
+    action: DENY
+    priority: 5
+    match_conditions:
+      time:
+        hour:
+          not_in:
+            - 9
+            - 10
+            - 11
+            - 12
+            - 13
+            - 14
+            - 15
+            - 16
+            - 17
+    tags:
+      - after-hours
+      - default-deny

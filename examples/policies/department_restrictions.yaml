@@ -1,0 +1,342 @@
+# =============================================================================
+# Department Restrictions Policy
+# =============================================================================
+#
+# This example demonstrates how to create different access rules for
+# different departments within an organization.
+#
+# Use Case:
+#   - Engineering: Full access to all approved models
+#   - Data Science: Access to powerful models for analytics
+#   - Finance: Limited to cost-effective models
+#   - Marketing: Access to content generation, no code models
+#   - HR: Basic access only, no sensitive data processing
+#   - Contractors: Restricted access with audit logging
+#
+# Prerequisites:
+#   - User requests must include a 'department' attribute
+#   - Department values must be standardized (lowercase, hyphenated)
+#
+# How It Works:
+#   - Each department has specific rules defining their access
+#   - Higher priority deny rules override department allows
+#   - Unknown departments fall through to default deny
+#
+# =============================================================================
+
+name: department-restrictions-policy
+version: "1.0.0"
+description: Department-based access control for AI model usage
+
+metadata:
+  author: security-team
+  created: "2024-01-01"
+  compliance: internal-policy
+  review_cycle: quarterly
+
+# =============================================================================
+# Rules Section
+# =============================================================================
+
+rules:
+  # -------------------------------------------------------------------------
+  # Universal Deny Rules (Highest Priority)
+  # -------------------------------------------------------------------------
+  # These rules apply to ALL departments, regardless of other permissions.
+
+  - name: deny-all-image-generation
+    description: |
+      No department is allowed to use image generation models.
+      This is a company-wide restriction for content control.
+    action: DENY
+    priority: 300
+    match_conditions:
+      model:
+        in:
+          - dall-e-3
+          - dall-e-2
+          - stable-diffusion
+          - midjourney
+    tags:
+      - universal-deny
+      - image-generation
+
+  - name: deny-suspended-users
+    description: |
+      Block any user whose access has been suspended, regardless
+      of their department permissions.
+    action: DENY
+    priority: 300
+    match_conditions:
+      user_id:
+        in:
+          - suspended-user-001
+          - suspended-user-002
+    tags:
+      - universal-deny
+      - suspended
+
+  # -------------------------------------------------------------------------
+  # Engineering Department (Full Access)
+  # -------------------------------------------------------------------------
+
+  - name: allow-engineering-all-models
+    description: |
+      Engineering department has full access to all text-based AI models
+      for development, testing, and production use cases.
+    action: ALLOW
+    priority: 200
+    match_conditions:
+      department: engineering
+      provider:
+        in:
+          - openai
+          - anthropic
+          - google
+          - cohere
+    tags:
+      - department
+      - engineering
+      - full-access
+
+  # -------------------------------------------------------------------------
+  # Data Science Department (Analytics Focus)
+  # -------------------------------------------------------------------------
+
+  - name: allow-data-science-powerful-models
+    description: |
+      Data Science can use powerful models for analytics, ML tasks,
+      and research. Access to both large and efficient models.
+    action: ALLOW
+    priority: 200
+    match_conditions:
+      department: data-science
+      model:
+        in:
+          - gpt-4
+          - gpt-4-turbo
+          - gpt-4o
+          - claude-3-opus
+          - claude-3-sonnet
+          - gemini-pro
+    tags:
+      - department
+      - data-science
+      - analytics
+
+  - name: allow-data-science-embeddings
+    description: |
+      Data Science can use embedding models for vector search
+      and similarity analysis.
+    action: ALLOW
+    priority: 200
+    match_conditions:
+      department: data-science
+      model:
+        in:
+          - text-embedding-ada-002
+          - text-embedding-3-small
+          - text-embedding-3-large
+    tags:
+      - department
+      - data-science
+      - embeddings
+
+  # -------------------------------------------------------------------------
+  # Research Department (Experimental Access)
+  # -------------------------------------------------------------------------
+
+  - name: allow-research-experimental
+    description: |
+      Research department can access experimental and preview models
+      for evaluation and testing purposes.
+    action: ALLOW
+    priority: 200
+    match_conditions:
+      department: research
+      provider:
+        in:
+          - openai
+          - anthropic
+          - google
+    tags:
+      - department
+      - research
+      - experimental
+
+  # -------------------------------------------------------------------------
+  # Finance Department (Cost-Controlled)
+  # -------------------------------------------------------------------------
+
+  - name: allow-finance-cost-effective
+    description: |
+      Finance department is limited to cost-effective models
+      to manage AI spending. GPT-4 access requires approval.
+    action: ALLOW
+    priority: 200
+    match_conditions:
+      department: finance
+      model:
+        in:
+          - gpt-3.5-turbo
+          - gpt-3.5-turbo-16k
+          - claude-3-haiku
+          - gpt-4o-mini
+    tags:
+      - department
+      - finance
+      - cost-effective
+
+  - name: deny-finance-expensive-models
+    description: |
+      Explicitly deny Finance access to expensive models.
+      Budget controls require using cost-effective alternatives.
+    action: DENY
+    priority: 210
+    match_conditions:
+      department: finance
+      model:
+        in:
+          - gpt-4
+          - gpt-4-turbo
+          - claude-3-opus
+    tags:
+      - department
+      - finance
+      - cost-control
+
+  # -------------------------------------------------------------------------
+  # Marketing Department (Content Focus)
+  # -------------------------------------------------------------------------
+
+  - name: allow-marketing-content-models
+    description: |
+      Marketing can use models for content generation, copywriting,
+      and campaign development.
+    action: ALLOW
+    priority: 200
+    match_conditions:
+      department: marketing
+      model:
+        in:
+          - gpt-4
+          - gpt-4o
+          - gpt-3.5-turbo
+          - claude-3-sonnet
+          - claude-3-haiku
+    tags:
+      - department
+      - marketing
+      - content
+
+  - name: deny-marketing-code-models
+    description: |
+      Marketing should not use code-specialized models.
+      Route technical needs through Engineering.
+    action: DENY
+    priority: 210
+    match_conditions:
+      department: marketing
+      use_case:
+        in:
+          - code-generation
+          - code-review
+          - debugging
+    tags:
+      - department
+      - marketing
+      - restricted
+
+  # -------------------------------------------------------------------------
+  # HR Department (Basic Access)
+  # -------------------------------------------------------------------------
+
+  - name: allow-hr-basic-models
+    description: |
+      HR department has access to basic models for document
+      processing and communication drafting.
+    action: ALLOW
+    priority: 200
+    match_conditions:
+      department: hr
+      model:
+        in:
+          - gpt-3.5-turbo
+          - claude-3-haiku
+          - gpt-4o-mini
+    tags:
+      - department
+      - hr
+      - basic-access
+
+  # -------------------------------------------------------------------------
+  # Legal Department (Controlled Access)
+  # -------------------------------------------------------------------------
+
+  - name: allow-legal-approved-models
+    description: |
+      Legal department can use approved models for contract review,
+      document analysis, and legal research.
+    action: ALLOW
+    priority: 200
+    match_conditions:
+      department: legal
+      model:
+        in:
+          - gpt-4
+          - gpt-4-turbo
+          - claude-3-opus
+          - claude-3-sonnet
+    tags:
+      - department
+      - legal
+      - controlled
+
+  # -------------------------------------------------------------------------
+  # Contractors (Restricted Access with Audit)
+  # -------------------------------------------------------------------------
+
+  - name: audit-contractor-requests
+    description: |
+      All contractor requests are logged for audit purposes.
+      This rule uses AUDIT action which allows but flags for review.
+    action: AUDIT
+    priority: 190
+    match_conditions:
+      department: contractors
+    tags:
+      - department
+      - contractors
+      - audit
+
+  - name: allow-contractor-limited
+    description: |
+      Contractors have limited access to cost-effective models only.
+      All requests are audited (see audit rule above).
+    action: ALLOW
+    priority: 180
+    match_conditions:
+      department: contractors
+      model:
+        in:
+          - gpt-3.5-turbo
+          - claude-3-haiku
+    tags:
+      - department
+      - contractors
+      - limited
+
+  # -------------------------------------------------------------------------
+  # Default Deny
+  # -------------------------------------------------------------------------
+
+  - name: deny-unknown-department
+    description: |
+      Deny requests from unknown departments or requests missing
+      department information.
+    action: DENY
+    priority: 1
+    match_conditions: {}
+    tags:
+      - default
+      - security

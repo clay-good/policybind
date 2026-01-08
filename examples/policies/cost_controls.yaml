@@ -1,0 +1,321 @@
+# =============================================================================
+# Cost Controls Policy
+# =============================================================================
+#
+# This example demonstrates how to implement budget and cost-based policies
+# for AI model usage.
+#
+# Use Case:
+#   - Enforce per-request cost limits
+#   - Route to cheaper models when appropriate
+#   - Block expensive operations during high-cost periods
+#   - Implement tiered access based on cost budgets
+#   - Rate limit high-frequency users
+#
+# Prerequisites:
+#   - Requests must include 'estimated_cost' attribute
+#   - Token tracking must be enabled for budget enforcement
+#   - Department budgets should be configured in the system
+#
+# Cost Tiers (example pricing):
+#   - GPT-4: ~$0.03-0.06 per 1K tokens (expensive)
+#   - GPT-3.5: ~$0.001-0.002 per 1K tokens (cost-effective)
+#   - Claude Opus: ~$0.015-0.075 per 1K tokens (expensive)
+#   - Claude Haiku: ~$0.00025-0.00125 per 1K tokens (budget)
+#
+# =============================================================================
+
+name: cost-controls-policy
+version: "1.0.0"
+description: Budget and cost-based policies for AI model usage control
+
+metadata:
+  author: finance-team
+  created: "2024-01-01"
+  purpose: cost-management
+  budget_period: monthly
+
+# Variables for cost thresholds (can be overridden)
+variables:
+  high_cost_threshold: 1.00
+  medium_cost_threshold: 0.10
+  low_cost_threshold: 0.01
+  daily_user_limit: 50.00
+  monthly_dept_limit: 5000.00
+
+# =============================================================================
+# Rules Section
+# =============================================================================
+
+rules:
+  # -------------------------------------------------------------------------
+  # Hard Cost Limits (Highest Priority)
+  # -------------------------------------------------------------------------
+
+  - name: deny-excessive-single-request
+    description: |
+      Block any single request estimated to cost more than $1.00.
+      This prevents runaway costs from very large prompts or contexts.
+      Requests above this threshold need special approval.
+    action: DENY
+    priority: 400
+    match_conditions:
+      estimated_cost:
+        gt: ${high_cost_threshold}
+    tags:
+      - cost-control
+      - hard-limit
+      - excessive
+
+  - name: deny-large-token-requests
+    description: |
+      Block requests with estimated tokens exceeding 100,000.
+      Large context windows can result in unexpected high costs.
+    action: DENY
+    priority: 400
+    match_conditions:
+      estimated_tokens:
+        gt: 100000
+    tags:
+      - cost-control
+      - hard-limit
+      - tokens
+
+  # -------------------------------------------------------------------------
+  # Expensive Model Controls
+  # -------------------------------------------------------------------------
+
+  - name: require-approval-gpt4-high-cost
+    description: |
+      Require approval for GPT-4 requests estimated over $0.10.
+      This adds a human review step for significant expenses.
+    action: REQUIRE_APPROVAL
+    priority: 300
+    match_conditions:
+      model:
+        in:
+          - gpt-4
+          - gpt-4-turbo
+          - gpt-4o
+      estimated_cost:
+        gt: ${medium_cost_threshold}
+    tags:
+      - cost-control
+      - approval-required
+      - gpt4
+
+  - name: require-approval-opus-requests
+    description: |
+      Claude Opus is the most expensive Claude model.
+      Require approval for any Opus requests over $0.10.
+    action: REQUIRE_APPROVAL
+    priority: 300
+    match_conditions:
+      model: claude-3-opus
+      estimated_cost:
+        gt: ${medium_cost_threshold}
+    tags:
+      - cost-control
+      - approval-required
+      - opus
+
+  # -------------------------------------------------------------------------
+  # Model Redirection (Cost Optimization)
+  # -------------------------------------------------------------------------
+
+  - name: redirect-simple-queries-to-haiku
+    description: |
+      Simple queries (low complexity use cases) should use Claude Haiku
+      instead of more expensive models. This is a cost optimization.
+    action: MODIFY
+    priority: 250
+    action_params:
+      modify_model: claude-3-haiku
+      reason: "Cost optimization: simple query redirected to Haiku"
+    match_conditions:
+      use_case:
+        in:
+          - simple-qa
+          - classification
+          - summarization-short
+      model:
+        in:
+          - claude-3-opus
+          - claude-3-sonnet
+    tags:
+      - cost-optimization
+      - redirect
+
+  - name: redirect-to-gpt35-for-basic-tasks
+    description: |
+      Basic text tasks should use GPT-3.5 instead of GPT-4.
+      This saves approximately 90% on these requests.
+    action: MODIFY
+    priority: 250
+    action_params:
+      modify_model: gpt-3.5-turbo
+      reason: "Cost optimization: basic task redirected to GPT-3.5"
+    match_conditions:
+      use_case:
+        in:
+          - text-formatting
+          - spell-check
+          - simple-translation
+      model:
+        in:
+          - gpt-4
+          - gpt-4-turbo
+    tags:
+      - cost-optimization
+      - redirect
+
+  # -------------------------------------------------------------------------
+  # Rate Limiting
+  # -------------------------------------------------------------------------
+
+  - name: rate-limit-individual-users
+    description: |
+      Limit individual users to 100 requests per hour to prevent
+      abuse and ensure fair resource distribution.
+    action: RATE_LIMIT
+    priority: 200
+    action_params:
+      limit: 100
+      period: hour
+      key: user_id
+    match_conditions: {}
+    tags:
+      - rate-limit
+      - user
+
+  - name: rate-limit-expensive-models
+    description: |
+      Apply stricter rate limits to expensive models.
+      Max 20 GPT-4/Opus requests per hour per user.
+    action: RATE_LIMIT
+    priority: 210
+    action_params:
+      limit: 20
+      period: hour
+      key: user_id
+    match_conditions:
+      model:
+        in:
+          - gpt-4
+          - gpt-4-turbo
+          - claude-3-opus
+    tags:
+      - rate-limit
+      - expensive-models
+
+  # -------------------------------------------------------------------------
+  # Budget Tier Access
+  # -------------------------------------------------------------------------
+
+  - name: allow-budget-tier-models
+    description: |
+      Budget tier: Allow access to cost-effective models without
+      additional restrictions. These are approved for general use.
+    action: ALLOW
+    priority: 100
+    match_conditions:
+      model:
+        in:
+          - gpt-3.5-turbo
+          - gpt-3.5-turbo-16k
+          - gpt-4o-mini
+          - claude-3-haiku
+    tags:
+      - budget-tier
+      - approved
+
+  - name: allow-standard-tier-models
+    description: |
+      Standard tier: Allow mid-range models with basic cost controls.
+      These have moderate pricing and good capabilities.
+    action: ALLOW
+    priority: 100
+    match_conditions:
+      model:
+        in:
+          - gpt-4o
+          - claude-3-sonnet
+          - claude-3-5-sonnet
+          - gemini-pro
+    tags:
+      - standard-tier
+      - approved
+
+  - name: allow-premium-tier-with-justification
+    description: |
+      Premium tier: Allow expensive models when use case justifies it.
+      Requires a valid use_case to be specified.
+    action: ALLOW
+    priority: 100
+    match_conditions:
+      model:
+        in:
+          - gpt-4
+          - gpt-4-turbo
+          - claude-3-opus
+      use_case:
+        in:
+          - complex-reasoning
+          - code-generation
+          - legal-analysis
+          - medical-research
+          - financial-modeling
+    tags:
+      - premium-tier
+      - justified
+
+  # -------------------------------------------------------------------------
+  # Cost Tracking and Audit
+  # -------------------------------------------------------------------------
+
+  - name: audit-high-value-requests
+    description: |
+      Flag all requests with estimated cost over $0.05 for audit review.
+      This helps identify cost optimization opportunities.
+    action: AUDIT
+    priority: 50
+    match_conditions:
+      estimated_cost:
+        gt: 0.05
+    tags:
+      - audit
+      - cost-tracking
+
+  # -------------------------------------------------------------------------
+  # Default Handling
+  # -------------------------------------------------------------------------
+
+  - name: deny-unclassified-expensive
+    description: |
+      Deny requests to expensive models without proper classification
+      or use case specification.
+    action: DENY
+    priority: 10
+    match_conditions:
+      model:
+        in:
+          - gpt-4
+          - gpt-4-turbo
+          - claude-3-opus
+    tags:
+      - default
+      - requires-classification
+
+  - name: allow-other-approved
+    description: |
+      Allow other requests that have passed through cost controls.
+    action: ALLOW
+    priority: 5
+    match_conditions:
+      provider:
+        in:
+          - openai
+          - anthropic
+    tags:
+      - default
+      - approved-provider

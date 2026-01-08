@@ -1,0 +1,47 @@
+# Data Classification Policy Fixture
+# Policy that enforces access based on data sensitivity
+
+name: data-classification-policy
+version: "1.0.0"
+description: Data classification enforcement policy
+
+rules:
+  - name: deny-phi-all
+    description: Deny all access for PHI data
+    action: DENY
+    priority: 200
+    match_conditions:
+      data_classification:
+        contains: phi
+
+  - name: deny-pii-public-models
+    description: Deny PII data on non-enterprise models
+    action: DENY
+    priority: 150
+    match_conditions:
+      data_classification:
+        contains: pii
+      model:
+        not_in:
+          - gpt-4-enterprise
+          - claude-3-enterprise
+
+  - name: allow-confidential-gpt4
+    description: Allow confidential data with GPT-4
+    action: ALLOW
+    priority: 100
+    match_conditions:
+      data_classification:
+        contains: confidential
+      model:
+        in:
+          - gpt-4
+          - gpt-4-enterprise
+
+  - name: allow-public-data
+    description: Allow public data on all models
+    action: ALLOW
+    priority: 50
+    match_conditions:
+      data_classification:
+        contains: public

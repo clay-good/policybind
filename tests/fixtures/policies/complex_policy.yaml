@@ -1,0 +1,127 @@
+# Complex Policy Fixture
+# Multi-rule policy for testing complex scenarios
+
+name: complex-enterprise-policy
+version: "2.0.0"
+description: Complex enterprise policy with multiple rule types
+
+metadata:
+  author: security-team
+  review_date: "2024-01-15"
+  compliance: SOC2
+
+rules:
+  # Blocklist rules (highest priority)
+  - name: deny-blocked-users
+    description: Block specific users
+    action: DENY
+    priority: 300
+    match_conditions:
+      user_id:
+        in:
+          - blocked-user-001
+          - blocked-user-002
+          - suspended-account
+
+  # Security rules (high priority)
+  - name: deny-phi-data
+    description: Never allow PHI data
+    action: DENY
+    priority: 250
+    match_conditions:
+      data_classification:
+        contains: phi
+
+  - name: deny-pii-external
+    description: Deny PII on external-facing models
+    action: DENY
+    priority: 240
+    match_conditions:
+      data_classification:
+        contains: pii
+      deployment_type: external
+
+  # Department-specific rules
+  - name: allow-engineering-full
+    description: Engineering has full access
+    action: ALLOW
+    priority: 150
+    match_conditions:
+      department: engineering
+    tags:
+      - department
+      - full-access
+
+  - name: allow-data-science-full
+    description: Data science has full access
+    action: ALLOW
+    priority: 150
+    match_conditions:
+      department: data-science
+    tags:
+      - department
+      - full-access
+
+  - name: allow-research-expensive
+    description: Research can use expensive models
+    action: ALLOW
+    priority: 140
+    match_conditions:
+      department: research
+      model:
+        in:
+          - gpt-4
+          - gpt-4-turbo
+          - claude-3-opus
+    tags:
+      - department
+      - limited-access
+
+  - name: allow-finance-text
+    description: Finance limited to text models
+    action: ALLOW
+    priority: 130
+    match_conditions:
+      department: finance
+      model:
+        in:
+          - gpt-3.5-turbo
+          - gpt-4
+    tags:
+      - department
+      - limited-access
+
+  # Cost control rules
+  - name: deny-image-gen-all
+    description: Deny image generation by default
+    action: DENY
+    priority: 100
+    match_conditions:
+      model:
+        in:
+          - dall-e-3
+          - dall-e-2
+          - midjourney
+          - stable-diffusion
+    tags:
+      - cost-control
+      - image-generation
+
+  # Provider-specific defaults
+  - name: allow-openai-default
+    description: Allow OpenAI models by default
+    action: ALLOW
+    priority: 20
+    match_conditions:
+      provider: openai
+    tags:
+      - provider-default
+
+  - name: allow-anthropic-default
+    description: Allow Anthropic models by default
+    action: ALLOW
+    priority: 20
+    match_conditions:
+      provider: anthropic
+    tags:
+      - provider-default

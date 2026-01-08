@@ -1,0 +1,463 @@
+# =============================================================================
+# Model-Specific Policy
+# =============================================================================
+#
+# This example demonstrates fine-grained policies for specific AI models,
+# including capability-based restrictions, version controls, and use case
+# mappings.
+#
+# Use Case:
+#   - Define which models are approved for which use cases
+#   - Control access to specific model capabilities (vision, code, etc.)
+#   - Manage model version transitions and deprecations
+#   - Route requests to appropriate models based on requirements
+#   - Enforce model-specific rate limits and quotas
+#
+# Model Categories:
+#   - Text Generation: GPT-4, Claude, Gemini
+#   - Code Generation: Codex, CodeLlama, specialized models
+#   - Vision/Multimodal: GPT-4V, Claude 3, Gemini Pro Vision
+#   - Embeddings: Ada, text-embedding models
+#   - Image Generation: DALL-E, Stable Diffusion, Midjourney
+#
+# Prerequisites:
+#   - Model registry should be populated with approved models
+#   - Model capabilities should be documented
+#   - Use case taxonomy should be established
+#
+# =============================================================================
+
+name: model-specific-policy
+version: "1.0.0"
+description: Fine-grained policies for specific AI models and their capabilities
+
+metadata:
+  author: ai-platform-team
+  created: "2024-01-01"
+  model_registry_version: "2024-01"
+  capability_definitions: see-docs/model-capabilities.md
+
+# =============================================================================
+# Rules Section
+# =============================================================================
+
+rules:
+  # -------------------------------------------------------------------------
+  # Vision/Multimodal Model Controls
+  # -------------------------------------------------------------------------
+
+  - name: deny-vision-models-unapproved
+    description: |
+      Vision-capable models (GPT-4V, Claude 3 Vision) require special
+      approval due to potential privacy and content moderation concerns.
+      Images may contain PII or sensitive information.
+    action: DENY
+    priority: 400
+    match_conditions:
+      model:
+        in:
+          - gpt-4-vision-preview
+          - gpt-4o  # Has vision capability
+          - claude-3-opus  # Has vision capability
+          - claude-3-sonnet  # Has vision capability
+          - gemini-pro-vision
+      input_type: image
+      vision_approved: false
+    tags:
+      - vision
+      - multimodal
+      - approval-required
+
+  - name: allow-vision-approved-use-cases
+    description: |
+      Allow vision models for approved use cases only:
+      - Document processing (OCR, form extraction)
+      - Diagram analysis (technical diagrams, charts)
+      - Accessibility (image descriptions)
+    action: ALLOW
+    priority: 350
+    match_conditions:
+      input_type: image
+      use_case:
+        in:
+          - document-processing
+          - diagram-analysis
+          - accessibility
+          - chart-extraction
+      vision_approved: true
+    tags:
+      - vision
+      - approved-use-case
+
+  - name: deny-vision-facial-recognition
+    description: |
+      Block any requests that involve facial recognition or
+      biometric analysis. This is prohibited under our AI ethics policy.
+    action: DENY
+    priority: 500
+    match_conditions:
+      input_type: image
+      use_case:
+        in:
+          - facial-recognition
+          - biometric-analysis
+          - person-identification
+    tags:
+      - vision
+      - prohibited
+      - ethics
+
+  # -------------------------------------------------------------------------
+  # Code Generation Model Controls
+  # -------------------------------------------------------------------------
+
+  - name: allow-code-models-engineering
+    description: |
+      Code-optimized models are available to engineering teams
+      for development tasks.
+    action: ALLOW
+    priority: 300
+    match_conditions:
+      department: engineering
+      model:
+        in:
+          - gpt-4
+          - gpt-4-turbo
+          - claude-3-opus
+          - claude-3-sonnet
+          - codellama-34b
+          - starcoder
+      use_case:
+        in:
+          - code-generation
+          - code-review
+          - debugging
+          - documentation
+          - refactoring
+    tags:
+      - code
+      - engineering
+
+  - name: deny-code-models-non-tech
+    description: |
+      Non-technical departments should not use code generation features.
+      Route through Engineering for technical needs.
+    action: DENY
+    priority: 310
+    match_conditions:
+      department:
+        in:
+          - marketing
+          - hr
+          - finance
+          - legal
+      use_case:
+        in:
+          - code-generation
+          - code-review
+          - debugging
+    tags:
+      - code
+      - department-restriction
+
+  - name: audit-code-generation-all
+    description: |
+      All code generation requests are audited for security review.
+      This helps detect potential vulnerabilities in generated code.
+    action: AUDIT
+    priority: 200
+    match_conditions:
+      use_case:
+        in:
+          - code-generation
+          - code-review
+    tags:
+      - code
+      - security-audit
+
+  # -------------------------------------------------------------------------
+  # Embedding Model Controls
+  # -------------------------------------------------------------------------
+
+  - name: allow-embedding-models
+    description: |
+      Embedding models are available for vector search and
+      similarity applications. These have lower risk profiles.
+    action: ALLOW
+    priority: 250
+    match_conditions:
+      model:
+        in:
+          - text-embedding-ada-002
+          - text-embedding-3-small
+          - text-embedding-3-large
+          - voyage-2
+          - voyage-code-2
+    tags:
+      - embeddings
+      - approved
+
+  - name: rate-limit-embeddings
+    description: |
+      Rate limit embedding requests to control costs.
+      Embeddings are often used in batch operations.
+    action: RATE_LIMIT
+    priority: 240
+    action_params:
+      limit: 1000
+      period: minute
+      key: user_id
+    match_conditions:
+      model:
+        in:
+          - text-embedding-ada-002
+          - text-embedding-3-small
+          - text-embedding-3-large
+    tags:
+      - embeddings
+      - rate-limit
+
+  # -------------------------------------------------------------------------
+  # Model Version Controls
+  # -------------------------------------------------------------------------
+
+  - name: deny-deprecated-gpt3
+    description: |
+      GPT-3 models are deprecated and should not be used.
+      Migrate to GPT-3.5-turbo or GPT-4.
+    action: DENY
+    priority: 400
+    match_conditions:
+      model:
+        in:
+          - text-davinci-003
+          - text-davinci-002
+          - text-curie-001
+          - text-babbage-001
+          - text-ada-001
+    tags:
+      - deprecated
+      - migration-required
+
+  - name: warn-legacy-gpt35
+    description: |
+      Older GPT-3.5 variants should migrate to gpt-3.5-turbo.
+      Allow but flag for review.
+    action: AUDIT
+    priority: 200
+    match_conditions:
+      model:
+        in:
+          - gpt-3.5-turbo-0301
+          - gpt-3.5-turbo-0613
+    tags:
+      - legacy
+      - migration-recommended
+
+  - name: deny-beta-preview-production
+    description: |
+      Beta/preview models are not approved for production use.
+      Only allowed in development and testing environments.
+    action: DENY
+    priority: 350
+    match_conditions:
+      model:
+        pattern: ".*-preview$|.*-beta$"
+      environment:
+        not_in:
+          - development
+          - testing
+          - staging
+    tags:
+      - beta
+      - preview
+      - non-production
+
+  - name: allow-beta-development
+    description: |
+      Beta/preview models can be used in development environments
+      for evaluation purposes.
+    action: ALLOW
+    priority: 360
+    match_conditions:
+      model:
+        pattern: ".*-preview$|.*-beta$"
+      environment:
+        in:
+          - development
+          - testing
+    tags:
+      - beta
+      - preview
+      - development
+
+  # -------------------------------------------------------------------------
+  # Use Case to Model Mapping
+  # -------------------------------------------------------------------------
+
+  - name: route-summarization-to-haiku
+    description: |
+      Summarization tasks should use Claude Haiku or GPT-3.5 for
+      cost efficiency. These models perform well on this task.
+    action: MODIFY
+    priority: 200
+    action_params:
+      modify_model: claude-3-haiku
+      reason: "Cost optimization: summarization routed to Haiku"
+    match_conditions:
+      use_case: summarization
+      model:
+        in:
+          - gpt-4
+          - claude-3-opus
+    tags:
+      - routing
+      - cost-optimization
+
+  - name: route-complex-reasoning-to-opus
+    description: |
+      Complex reasoning tasks benefit from Claude Opus.
+      Route these requests to the most capable model.
+    action: MODIFY
+    priority: 200
+    action_params:
+      modify_model: claude-3-opus
+      reason: "Capability routing: complex reasoning to Opus"
+    match_conditions:
+      use_case:
+        in:
+          - complex-reasoning
+          - mathematical-analysis
+          - legal-reasoning
+      model:
+        not_in:
+          - claude-3-opus
+          - gpt-4
+    tags:
+      - routing
+      - capability-matching
+
+  - name: require-gpt4-for-medical
+    description: |
+      Medical/healthcare use cases require GPT-4 or Claude Opus
+      for accuracy. Cheaper models are not approved for this.
+    action: DENY
+    priority: 300
+    match_conditions:
+      use_case:
+        in:
+          - medical-information
+          - healthcare-support
+          - clinical-decision-support
+      model:
+        not_in:
+          - gpt-4
+          - gpt-4-turbo
+          - claude-3-opus
+    tags:
+      - medical
+      - accuracy-required
+
+  # -------------------------------------------------------------------------
+  # Provider-Specific Rules
+  # -------------------------------------------------------------------------
+
+  - name: prefer-openai-for-code
+    description: |
+      OpenAI models are preferred for code generation tasks
+      based on internal benchmarks.
+    action: ALLOW
+    priority: 150
+    match_conditions:
+      provider: openai
+      use_case:
+        in:
+          - code-generation
+          - code-review
+    tags:
+      - provider-preference
+      - code
+
+  - name: prefer-anthropic-for-analysis
+    description: |
+      Anthropic models are preferred for analysis and reasoning tasks
+      based on internal benchmarks.
+    action: ALLOW
+    priority: 150
+    match_conditions:
+      provider: anthropic
+      use_case:
+        in:
+          - document-analysis
+          - research
+          - complex-reasoning
+    tags:
+      - provider-preference
+      - analysis
+
+  # -------------------------------------------------------------------------
+  # Model Capability Restrictions
+  # -------------------------------------------------------------------------
+
+  - name: deny-function-calling-unauthorized
+    description: |
+      Function calling / tool use requires special authorization.
+      This capability can interact with external systems.
+    action: DENY
+    priority: 350
+    match_conditions:
+      feature: function_calling
+      function_calling_approved: false
+    tags:
+      - capability
+      - function-calling
+      - security
+
+  - name: allow-function-calling-approved
+    description: |
+      Allow function calling for authorized applications with
+      reviewed function definitions.
+    action: ALLOW
+    priority: 360
+    match_conditions:
+      feature: function_calling
+      function_calling_approved: true
+    tags:
+      - capability
+      - function-calling
+      - approved
+
+  # -------------------------------------------------------------------------
+  # Default Rules
+  # -------------------------------------------------------------------------
+
+  - name: allow-standard-text-models
+    description: |
+      Standard text generation models are allowed for general use.
+    action: ALLOW
+    priority: 50
+    match_conditions:
+      model:
+        in:
+          - gpt-4
+          - gpt-4-turbo
+          - gpt-4o
+          - gpt-3.5-turbo
+          - claude-3-opus
+          - claude-3-sonnet
+          - claude-3-haiku
+          - claude-3-5-sonnet
+    tags:
+      - standard
+      - approved
+
+  - name: deny-unknown-models
+    description: |
+      Unknown or unapproved models are blocked by default.
+      New models must be added to the approved list.
+    action: DENY
+    priority: 1
+    match_conditions: {}
+    tags:
+      - default
+      - security

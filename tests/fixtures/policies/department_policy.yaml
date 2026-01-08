@@ -1,0 +1,54 @@
+# Department-Based Policy Fixture
+# Policy that enforces access based on department
+
+name: department-policy
+version: "1.0.0"
+description: Department-based access control policy
+
+rules:
+  - name: allow-engineering-all
+    description: Engineering department has full access
+    action: ALLOW
+    priority: 100
+    match_conditions:
+      department: engineering
+
+  - name: allow-research-gpt4
+    description: Research can use GPT-4
+    action: ALLOW
+    priority: 100
+    match_conditions:
+      department: research
+      model: gpt-4
+
+  - name: allow-finance-gpt35
+    description: Finance limited to GPT-3.5
+    action: ALLOW
+    priority: 100
+    match_conditions:
+      department: finance
+      model: gpt-3.5-turbo
+
+  - name: deny-marketing-expensive
+    description: Marketing cannot use expensive models
+    action: DENY
+    priority: 90
+    match_conditions:
+      department: marketing
+      model:
+        in:
+          - gpt-4
+          - gpt-4-turbo
+          - claude-3-opus
+
+  - name: deny-hr-image-gen
+    description: HR cannot use image generation
+    action: DENY
+    priority: 90
+    match_conditions:
+      department: hr
+      model:
+        in:
+          - dall-e-3
+          - dall-e-2
+          - midjourney

@@ -1,0 +1,347 @@
+# =============================================================================
+# Data Classification Policy
+# =============================================================================
+#
+# This example demonstrates how to implement data sensitivity-based policies
+# for AI model usage. Critical for compliance with data protection regulations.
+#
+# Use Case:
+#   - Enforce data handling rules based on sensitivity levels
+#   - Block sensitive data from being sent to unauthorized models
+#   - Require special handling for PII, PHI, financial data
+#   - Ensure GDPR, HIPAA, and PCI-DSS compliance
+#   - Route sensitive data to enterprise/compliant endpoints only
+#
+# Data Classification Levels:
+#   - public: Publicly available information, no restrictions
+#   - internal: Internal company information, basic controls
+#   - confidential: Business-sensitive data, restricted access
+#   - pii: Personally Identifiable Information (names, emails, etc.)
+#   - phi: Protected Health Information (HIPAA regulated)
+#   - pci: Payment Card Industry data (credit cards, etc.)
+#   - restricted: Highly sensitive, maximum controls
+#
+# Prerequisites:
+#   - Requests must include 'data_classification' attribute (list)
+#   - Data classification should be determined before request submission
+#   - Enterprise model endpoints should be configured for sensitive data
+#
+# =============================================================================
+
+name: data-classification-policy
+version: "1.0.0"
+description: Data sensitivity-based policies for AI model access control
+
+metadata:
+  author: compliance-team
+  created: "2024-01-01"
+  compliance:
+    - GDPR
+    - HIPAA
+    - PCI-DSS
+    - SOC2
+  review_cycle: quarterly
+  data_protection_officer: dpo@company.com
+
+# =============================================================================
+# Rules Section
+# =============================================================================
+
+rules:
+  # -------------------------------------------------------------------------
+  # Absolute Blocks (Highest Priority)
+  # -------------------------------------------------------------------------
+  # These data types should NEVER be sent to AI models under any circumstances.
+
+  - name: deny-phi-all-models
+    description: |
+      HIPAA COMPLIANCE: Protected Health Information (PHI) must NEVER
+      be sent to any AI model. This includes:
+      - Patient names and contact information
+      - Medical record numbers
+      - Health conditions and diagnoses
+      - Treatment information
+      - Insurance information
+
+      Violation of this rule may result in HIPAA penalties.
+    action: DENY
+    priority: 500
+    match_conditions:
+      data_classification:
+        contains: phi
+    tags:
+      - compliance
+      - hipaa
+      - phi
+      - absolute-block
+
+  - name: deny-pci-all-models
+    description: |
+      PCI-DSS COMPLIANCE: Payment Card Industry data must NEVER
+      be sent to AI models. This includes:
+      - Credit/debit card numbers
+      - CVV/CVC codes
+      - Cardholder names
+      - Expiration dates
+
+      Violation may result in PCI-DSS compliance failure.
+    action: DENY
+    priority: 500
+    match_conditions:
+      data_classification:
+        contains: pci
+    tags:
+      - compliance
+      - pci-dss
+      - absolute-block
+
+  - name: deny-restricted-non-enterprise
+    description: |
+      Restricted data can only be processed by enterprise endpoints
+      with appropriate data processing agreements in place.
+    action: DENY
+    priority: 500
+    match_conditions:
+      data_classification:
+        contains: restricted
+      model:
+        not_in:
+          - gpt-4-enterprise
+          - claude-3-enterprise
+          - azure-openai-gpt4
+    tags:
+      - compliance
+      - restricted
+      - enterprise-only
+
+  # -------------------------------------------------------------------------
+  # PII Handling Rules
+  # -------------------------------------------------------------------------
+  # PII can be processed only with appropriate controls.
+
+  - name: deny-pii-public-endpoints
+    description: |
+      GDPR/CCPA COMPLIANCE: PII must not be sent to public API endpoints.
+      Only enterprise endpoints with Data Processing Agreements (DPAs)
+      are authorized to handle PII.
+
+      PII includes: names, email addresses, phone numbers, addresses,
+      national IDs, dates of birth, etc.
+    action: DENY
+    priority: 400
+    match_conditions:
+      data_classification:
+        contains: pii
+      model:
+        not_in:
+          - gpt-4-enterprise
+          - gpt-4-turbo-enterprise
+          - claude-3-enterprise
+          - azure-openai-gpt4
+          - azure-openai-gpt35
+    tags:
+      - compliance
+      - gdpr
+      - ccpa
+      - pii
+
+  - name: allow-pii-enterprise-endpoints
+    description: |
+      Allow PII to be processed by enterprise endpoints that have
+      appropriate Data Processing Agreements and comply with
+      GDPR/CCPA requirements.
+    action: ALLOW
+    priority: 350
+    match_conditions:
+      data_classification:
+        contains: pii
+      model:
+        in:
+          - gpt-4-enterprise
+          - gpt-4-turbo-enterprise
+          - claude-3-enterprise
+          - azure-openai-gpt4
+          - azure-openai-gpt35
+    tags:
+      - compliance
+      - gdpr
+      - pii
+      - enterprise
+
+  - name: audit-pii-requests
+    description: |
+      All PII-containing requests must be logged for audit purposes.
+      This helps demonstrate GDPR compliance.
+    action: AUDIT
+    priority: 300
+    match_conditions:
+      data_classification:
+        contains: pii
+    tags:
+      - compliance
+      - audit
+      - pii
+
+  # -------------------------------------------------------------------------
+  # Confidential Data Rules
+  # -------------------------------------------------------------------------
+
+  - name: deny-confidential-cheap-models
+    description: |
+      Confidential business data should not be sent to cheaper models
+      that may have different data retention policies.
+    action: DENY
+    priority: 300
+    match_conditions:
+      data_classification:
+        contains: confidential
+      model:
+        in:
+          - gpt-3.5-turbo
+          - claude-3-haiku
+    tags:
+      - confidential
+      - data-protection
+
+  - name: allow-confidential-premium-models
+    description: |
+      Confidential data can be processed by premium models with
+      enterprise-grade data handling.
+    action: ALLOW
+    priority: 250
+    match_conditions:
+      data_classification:
+        contains: confidential
+      model:
+        in:
+          - gpt-4
+          - gpt-4-turbo
+          - gpt-4-enterprise
+          - claude-3-opus
+          - claude-3-sonnet
+    tags:
+      - confidential
+      - approved
+
+  # -------------------------------------------------------------------------
+  # Internal Data Rules
+  # -------------------------------------------------------------------------
+
+  - name: allow-internal-most-models
+    description: |
+      Internal (non-public) company data can be processed by most
+      approved models with standard data handling.
+    action: ALLOW
+    priority: 200
+    match_conditions:
+      data_classification:
+        contains: internal
+      provider:
+        in:
+          - openai
+          - anthropic
+    tags:
+      - internal
+      - approved
+
+  - name: deny-internal-unapproved-providers
+    description: |
+      Internal data should not be sent to unapproved providers
+      without proper vetting and agreements.
+    action: DENY
+    priority: 210
+    match_conditions:
+      data_classification:
+        contains: internal
+      provider:
+        not_in:
+          - openai
+          - anthropic
+          - google
+          - azure
+    tags:
+      - internal
+      - unapproved-provider
+
+  # -------------------------------------------------------------------------
+  # Public Data Rules
+  # -------------------------------------------------------------------------
+
+  - name: allow-public-all-models
+    description: |
+      Public data has no restrictions and can be processed by any
+      approved model.
+    action: ALLOW
+    priority: 100
+    match_conditions:
+      data_classification:
+        contains: public
+    tags:
+      - public
+      - unrestricted
+
+  # -------------------------------------------------------------------------
+  # Unclassified Data Handling
+  # -------------------------------------------------------------------------
+
+  - name: require-classification
+    description: |
+      Requests without data classification must be rejected.
+      All requests must specify the sensitivity of the data being processed.
+      This ensures proper handling and compliance tracking.
+    action: DENY
+    priority: 50
+    match_conditions:
+      data_classification:
+        equals: null
+    tags:
+      - compliance
+      - requires-classification
+
+  - name: deny-empty-classification
+    description: |
+      Requests with empty classification list are treated as unclassified
+      and should be rejected.
+    action: DENY
+    priority: 50
+    match_conditions:
+      data_classification:
+        size: 0
+    tags:
+      - compliance
+      - requires-classification
+
+  # -------------------------------------------------------------------------
+  # Mixed Classification Handling
+  # -------------------------------------------------------------------------
+
+  - name: deny-mixed-with-phi
+    description: |
+      If any data in the request contains PHI, the entire request
+      must be treated as PHI regardless of other classifications.
+    action: DENY
+    priority: 450
+    match_conditions:
+      data_classification:
+        contains_any:
+          - phi
+          - pci
+    tags:
+      - compliance
+      - mixed-data
+      - highest-sensitivity-wins
+
+  # -------------------------------------------------------------------------
+  # Default Handling
+  # -------------------------------------------------------------------------
+
+  - name: default-deny-unclassified
+    description: |
+      Default deny for any request that hasn't matched a specific rule.
+      This ensures a secure-by-default posture.
+    action: DENY
+    priority: 1
+    match_conditions: {}
+    tags:
+      - default
+      - secure-by-default

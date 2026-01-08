@@ -1,0 +1,172 @@
+# =============================================================================
+# Basic Policy Example
+# =============================================================================
+#
+# This example demonstrates simple allow/deny rules for AI model access.
+# Use this as a starting point for understanding PolicyBind policy syntax.
+#
+# Use Case:
+#   - Allow access to common text generation models (GPT-4, GPT-3.5, Claude)
+#   - Deny access to image generation models
+#   - Deny access to deprecated or beta models
+#
+# Prerequisites:
+#   - PolicyBind installed and configured
+#   - Basic understanding of your AI model providers
+#
+# How Rules Work:
+#   - Rules are evaluated in priority order (higher priority first)
+#   - First matching rule determines the decision
+#   - If no rules match, the default action is DENY
+#
+# =============================================================================
+
+name: basic-policy
+version: "1.0.0"
+description: Basic allow/deny policy for AI model access control
+
+# Optional metadata for tracking and auditing
+metadata:
+  author: security-team
+  created: "2024-01-01"
+  last_review: "2024-01-01"
+  purpose: starter-policy
+
+# =============================================================================
+# Rules Section
+# =============================================================================
+# Rules are evaluated in priority order. Higher priority = evaluated first.
+# The first rule that matches determines the decision.
+
+rules:
+  # -------------------------------------------------------------------------
+  # Deny Rules (High Priority)
+  # -------------------------------------------------------------------------
+  # Deny rules should generally have higher priority than allow rules
+  # to ensure blocked content is always blocked.
+
+  - name: deny-image-generation
+    description: |
+      Block access to image generation models to prevent unauthorized
+      content creation and control costs.
+    action: DENY
+    priority: 100
+    match_conditions:
+      # Match any of these image generation models
+      model:
+        in:
+          - dall-e-3
+          - dall-e-2
+          - stable-diffusion
+          - midjourney
+    tags:
+      - image-generation
+      - cost-control
+
+  - name: deny-deprecated-models
+    description: |
+      Block access to deprecated models that should no longer be used.
+      This helps ensure users migrate to supported models.
+    action: DENY
+    priority: 100
+    match_conditions:
+      model:
+        in:
+          - gpt-3
+          - text-davinci-003
+          - text-davinci-002
+          - code-davinci-002
+    tags:
+      - deprecated
+      - migration
+
+  - name: deny-beta-models
+    description: |
+      Block access to beta/preview models until they are approved
+      for production use.
+    action: DENY
+    priority: 100
+    match_conditions:
+      model:
+        in:
+          - gpt-4-turbo-preview
+          - gpt-4-vision-preview
+    tags:
+      - beta
+      - unapproved
+
+  # -------------------------------------------------------------------------
+  # Allow Rules (Medium Priority)
+  # -------------------------------------------------------------------------
+  # These rules explicitly allow approved models and providers.
+
+  - name: allow-gpt-4
+    description: |
+      Allow access to GPT-4 models for general text generation tasks.
+      GPT-4 is approved for production use.
+    action: ALLOW
+    priority: 50
+    match_conditions:
+      provider: openai
+      model:
+        in:
+          - gpt-4
+          - gpt-4-turbo
+          - gpt-4o
+          - gpt-4o-mini
+    tags:
+      - approved
+      - production
+
+  - name: allow-gpt-35
+    description: |
+      Allow access to GPT-3.5 models for cost-effective text generation.
+      GPT-3.5 is approved for production use.
+    action: ALLOW
+    priority: 50
+    match_conditions:
+      provider: openai
+      model:
+        in:
+          - gpt-3.5-turbo
+          - gpt-3.5-turbo-16k
+    tags:
+      - approved
+      - production
+      - cost-effective
+
+  - name: allow-claude-models
+    description: |
+      Allow access to Claude models from Anthropic.
+      Claude models are approved for production use.
+    action: ALLOW
+    priority: 50
+    match_conditions:
+      provider: anthropic
+      model:
+        in:
+          - claude-3-opus
+          - claude-3-sonnet
+          - claude-3-haiku
+          - claude-3-5-sonnet
+    tags:
+      - approved
+      - production
+
+  # -------------------------------------------------------------------------
+  # Default Deny (Lowest Priority)
+  # -------------------------------------------------------------------------
+  # This catch-all rule ensures any model not explicitly allowed is denied.
+  # This implements a "default deny" security posture.
+
+  - name: deny-all-other
+    description: |
+      Deny all requests that do not match an explicit allow rule.
+      This ensures only approved models can be used.
+    action: DENY
+    priority: 1
+    # Empty match_conditions matches everything
+    match_conditions: {}
+    tags:
+      - default
+      - security

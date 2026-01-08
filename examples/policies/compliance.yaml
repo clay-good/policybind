@@ -1,0 +1,366 @@
+# =============================================================================
+# Compliance Policy
+# =============================================================================
+#
+# This example demonstrates compliance-focused policies aligned with
+# major regulatory frameworks and industry standards.
+#
+# Use Case:
+#   - Ensure AI usage complies with EU AI Act requirements
+#   - Meet NIST AI Risk Management Framework guidelines
+#   - Satisfy SOC 2 audit requirements
+#   - Document risk assessments for AI deployments
+#   - Maintain audit trails for regulatory reporting
+#
+# Regulatory Frameworks Covered:
+#   - EU AI Act (high-risk AI system requirements)
+#   - NIST AI RMF (risk management practices)
+#   - SOC 2 (security, availability, confidentiality)
+#   - ISO 27001 (information security)
+#   - GDPR (data protection - see data_classification.yaml)
+#
+# Prerequisites:
+#   - Model deployments must be registered in the registry
+#   - Risk assessments must be completed for each deployment
+#   - Human oversight mechanisms must be documented
+#   - Audit logging must be enabled
+#
+# =============================================================================
+
+name: compliance-policy
+version: "1.0.0"
+description: Regulatory compliance policies for AI governance
+
+metadata:
+  author: compliance-team
+  created: "2024-01-01"
+  frameworks:
+    - EU-AI-Act
+    - NIST-AI-RMF
+    - SOC2
+    - ISO27001
+  review_cycle: quarterly
+  compliance_officer: compliance@company.com
+  last_audit: "2024-01-01"
+
+# =============================================================================
+# Rules Section
+# =============================================================================
+
+rules:
+  # -------------------------------------------------------------------------
+  # EU AI Act Compliance
+  # -------------------------------------------------------------------------
+  # The EU AI Act classifies AI systems into risk categories.
+  # High-risk systems require additional controls.
+
+  - name: deny-unregistered-deployments
+    description: |
+      EU AI ACT Art. 16: AI systems must be registered before use.
+      All AI model deployments must be registered in the model registry
+      with proper documentation before being used.
+    action: DENY
+    priority: 500
+    match_conditions:
+      deployment_status:
+        not_in:
+          - registered
+          - approved
+    tags:
+      - eu-ai-act
+      - registration
+      - mandatory
+
+  - name: require-approval-high-risk
+    description: |
+      EU AI ACT Art. 9: High-risk AI systems require conformity assessment.
+      Deployments classified as high-risk must undergo approval process
+      including risk assessment and human oversight documentation.
+    action: REQUIRE_APPROVAL
+    priority: 450
+    match_conditions:
+      risk_level: high
+      approval_status:
+        not_in:
+          - approved
+    tags:
+      - eu-ai-act
+      - high-risk
+      - conformity-assessment
+
+  - name: deny-critical-risk-without-review
+    description: |
+      EU AI ACT Art. 5: Certain AI uses are prohibited or require
+      special authorization. Critical risk deployments need executive review.
+    action: DENY
+    priority: 500
+    match_conditions:
+      risk_level: critical
+      executive_approval: false
+    tags:
+      - eu-ai-act
+      - prohibited-practices
+      - critical-risk
+
+  - name: audit-all-high-risk-requests
+    description: |
+      EU AI ACT Art. 12: High-risk AI systems must maintain logs.
+      All requests to high-risk deployments are logged for audit.
+    action: AUDIT
+    priority: 400
+    match_conditions:
+      risk_level:
+        in:
+          - high
+          - critical
+    tags:
+      - eu-ai-act
+      - logging
+      - audit-trail
+
+  # -------------------------------------------------------------------------
+  # NIST AI RMF Compliance
+  # -------------------------------------------------------------------------
+  # NIST AI Risk Management Framework focuses on:
+  # GOVERN, MAP, MEASURE, MANAGE
+
+  - name: require-risk-assessment
+    description: |
+      NIST AI RMF - MAP: AI risks must be identified and documented.
+      Deployments without a completed risk assessment are blocked.
+    action: DENY
+    priority: 400
+    match_conditions:
+      risk_assessment_completed: false
+    tags:
+      - nist-ai-rmf
+      - map
+      - risk-assessment
+
+  - name: require-human-oversight-high-risk
+    description: |
+      NIST AI RMF - GOVERN: Appropriate human oversight is required.
+      High-risk deployments must have documented human oversight mechanisms.
+    action: DENY
+    priority: 400
+    match_conditions:
+      risk_level:
+        in:
+          - high
+          - critical
+      human_oversight_documented: false
+    tags:
+      - nist-ai-rmf
+      - govern
+      - human-oversight
+
+  - name: require-performance-monitoring
+    description: |
+      NIST AI RMF - MEASURE: AI system performance must be monitored.
+      Deployments without performance monitoring setup are flagged.
+    action: AUDIT
+    priority: 300
+    match_conditions:
+      performance_monitoring: false
+    tags:
+      - nist-ai-rmf
+      - measure
+      - monitoring
+
+  # -------------------------------------------------------------------------
+  # SOC 2 Compliance
+  # -------------------------------------------------------------------------
+  # SOC 2 Trust Service Criteria:
+  # Security, Availability, Processing Integrity, Confidentiality, Privacy
+
+  - name: require-access-control
+    description: |
+      SOC 2 CC6.1: Logical and physical access to systems is restricted.
+      Requests must include valid user identification for access control.
+    action: DENY
+    priority: 400
+    match_conditions:
+      user_id:
+        equals: null
+    tags:
+      - soc2
+      - cc6
+      - access-control
+
+  - name: audit-all-data-access
+    description: |
+      SOC 2 CC7.2: System activities are monitored to detect anomalies.
+      All AI requests are logged for security monitoring.
+    action: AUDIT
+    priority: 100
+    match_conditions: {}
+    tags:
+      - soc2
+      - cc7
+      - monitoring
+
+  - name: deny-unapproved-providers
+    description: |
+      SOC 2 CC9.2: Risk from vendors is evaluated and managed.
+      Only approved AI providers with completed vendor assessments allowed.
+    action: DENY
+    priority: 350
+    match_conditions:
+      provider:
+        not_in:
+          - openai
+          - anthropic
+          - google
+          - azure
+          - aws-bedrock
+    tags:
+      - soc2
+      - cc9
+      - vendor-management
+
+  # -------------------------------------------------------------------------
+  # ISO 27001 Compliance
+  # -------------------------------------------------------------------------
+  # Information Security Management System requirements
+
+  - name: require-data-classification
+    description: |
+      ISO 27001 A.8.2: Information classification.
+      All requests must include data classification for proper handling.
+    action: DENY
+    priority: 350
+    match_conditions:
+      data_classification:
+        equals: null
+    tags:
+      - iso27001
+      - a8
+      - classification
+
+  - name: enforce-encryption-requirements
+    description: |
+      ISO 27001 A.10.1: Cryptographic controls.
+      Non-encrypted requests to AI services are blocked.
+      (Note: This assumes the enforcement layer checks transport security)
+    action: DENY
+    priority: 350
+    match_conditions:
+      transport_encrypted: false
+    tags:
+      - iso27001
+      - a10
+      - encryption
+
+  # -------------------------------------------------------------------------
+  # Incident Response Requirements
+  # -------------------------------------------------------------------------
+
+  - name: flag-anomalous-behavior
+    description: |
+      Compliance Requirement: Detect and respond to anomalies.
+      Unusual request patterns are flagged for investigation.
+    action: AUDIT
+    priority: 200
+    match_conditions:
+      anomaly_score:
+        gt: 0.8
+    tags:
+      - incident-response
+      - anomaly-detection
+
+  - name: block-during-active-incident
+    description: |
+      Incident Response: During active security incidents,
+      certain AI capabilities may be restricted.
+    action: DENY
+    priority: 500
+    match_conditions:
+      active_security_incident: true
+      model:
+        in:
+          - gpt-4
+          - claude-3-opus
+    tags:
+      - incident-response
+      - lockdown
+
+  # -------------------------------------------------------------------------
+  # Documentation and Audit Trail
+  # -------------------------------------------------------------------------
+
+  - name: require-use-case-documentation
+    description: |
+      Compliance Documentation: AI use cases must be documented.
+      Requests without a documented use case are blocked for
+      high-risk deployments.
+    action: DENY
+    priority: 300
+    match_conditions:
+      risk_level:
+        in:
+          - high
+          - critical
+      use_case:
+        equals: null
+    tags:
+      - documentation
+      - use-case
+
+  - name: retain-audit-logs
+    description: |
+      Compliance: All AI requests must be logged with retention.
+      This rule ensures every request is captured for compliance reporting.
+    action: AUDIT
+    priority: 10
+    match_conditions: {}
+    tags:
+      - audit
+      - retention
+      - compliance
+
+  # -------------------------------------------------------------------------
+  # Default Allow for Compliant Requests
+  # -------------------------------------------------------------------------
+
+  - name: allow-compliant-low-risk
+    description: |
+      Allow requests that meet all compliance requirements
+      for low-risk deployments.
+    action: ALLOW
+    priority: 50
+    match_conditions:
+      risk_level: low
+      deployment_status: approved
+    tags:
+      - compliant
+      - low-risk
+
+  - name: allow-compliant-medium-risk
+    description: |
+      Allow requests that meet compliance requirements
+      for medium-risk deployments.
+    action: ALLOW
+    priority: 50
+    match_conditions:
+      risk_level: medium
+      deployment_status: approved
+      risk_assessment_completed: true
+    tags:
+      - compliant
+      - medium-risk
+
+  - name: allow-compliant-high-risk
+    description: |
+      Allow requests that meet all compliance requirements
+      for high-risk deployments.
+    action: ALLOW
+    priority: 50
+    match_conditions:
+      risk_level: high
+      deployment_status: approved
+      approval_status: approved
+      risk_assessment_completed: true
+      human_oversight_documented: true
+    tags:
+      - compliant
+      - high-risk

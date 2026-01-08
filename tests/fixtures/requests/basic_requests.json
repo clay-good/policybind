@@ -1,0 +1,47 @@
+[
+  {
+    "description": "Basic GPT-4 request",
+    "request": {
+      "provider": "openai",
+      "model": "gpt-4",
+      "user_id": "user-001"
+    },
+    "expected_decision": "ALLOW"
+  },
+  {
+    "description": "Basic GPT-3.5 request",
+    "request": {
+      "provider": "openai",
+      "model": "gpt-3.5-turbo",
+      "user_id": "user-002"
+    },
+    "expected_decision": "ALLOW"
+  },
+  {
+    "description": "DALL-E request (should be denied)",
+    "request": {
+      "provider": "openai",
+      "model": "dall-e-3",
+      "user_id": "user-003"
+    },
+    "expected_decision": "DENY"
+  },
+  {
+    "description": "Claude model request",
+    "request": {
+      "provider": "anthropic",
+      "model": "claude-3-sonnet",
+      "user_id": "user-004"
+    },
+    "expected_decision": "ALLOW"
+  },
+  {
+    "description": "Unknown provider request",
+    "request": {
+      "provider": "unknown-provider",
+      "model": "some-model",
+      "user_id": "user-005"
+    },
+    "expected_decision": "DENY"
+  }
+]

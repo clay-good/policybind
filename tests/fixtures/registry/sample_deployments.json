@@ -1,0 +1,108 @@
+[
+  {
+    "name": "Engineering GPT-4 Deployment",
+    "description": "GPT-4 deployment for engineering team",
+    "model_provider": "openai",
+    "model_name": "gpt-4",
+    "owner": "engineering-team",
+    "owner_contact": "engineering@example.com",
+    "risk_level": "MEDIUM",
+    "approval_status": "APPROVED",
+    "data_categories": ["public", "confidential"],
+    "metadata": {
+      "cost_center": "CC-ENG-001",
+      "use_case": "Code assistance and documentation"
+    }
+  },
+  {
+    "name": "Finance GPT-3.5 Deployment",
+    "description": "GPT-3.5 deployment for finance team",
+    "model_provider": "openai",
+    "model_name": "gpt-3.5-turbo",
+    "owner": "finance-team",
+    "owner_contact": "finance@example.com",
+    "risk_level": "LOW",
+    "approval_status": "APPROVED",
+    "data_categories": ["public"],
+    "metadata": {
+      "cost_center": "CC-FIN-001",
+      "use_case": "Report generation"
+    }
+  },
+  {
+    "name": "Research Claude Deployment",
+    "description": "Claude 3 deployment for research team",
+    "model_provider": "anthropic",
+    "model_name": "claude-3-opus",
+    "owner": "research-team",
+    "owner_contact": "research@example.com",
+    "risk_level": "MEDIUM",
+    "approval_status": "APPROVED",
+    "data_categories": ["public", "confidential"],
+    "metadata": {
+      "cost_center": "CC-RES-001",
+      "use_case": "Research analysis"
+    }
+  },
+  {
+    "name": "Marketing Image Generation",
+    "description": "DALL-E deployment for marketing (pending)",
+    "model_provider": "openai",
+    "model_name": "dall-e-3",
+    "owner": "marketing-team",
+    "owner_contact": "marketing@example.com",
+    "risk_level": "HIGH",
+    "approval_status": "PENDING",
+    "data_categories": ["public"],
+    "metadata": {
+      "cost_center": "CC-MKT-001",
+      "use_case": "Marketing content creation"
+    }
+  },
+  {
+    "name": "Customer Service Bot",
+    "description": "GPT-4 deployment for customer service",
+    "model_provider": "openai",
+    "model_name": "gpt-4",
+    "owner": "support-team",
+    "owner_contact": "support@example.com",
+    "risk_level": "MEDIUM",
+    "approval_status": "APPROVED",
+    "data_categories": ["public", "pii"],
+    "metadata": {
+      "cost_center": "CC-SUP-001",
+      "use_case": "Customer support automation"
+    }
+  },
+  {
+    "name": "Internal Tool Integration",
+    "description": "Enterprise GPT-4 for internal tools",
+    "model_provider": "openai",
+    "model_name": "gpt-4-enterprise",
+    "owner": "it-team",
+    "owner_contact": "it@example.com",
+    "risk_level": "LOW",
+    "approval_status": "APPROVED",
+    "data_categories": ["public", "confidential", "pii"],
+    "metadata": {
+      "cost_center": "CC-IT-001",
+      "use_case": "Internal automation"
+    }
+  },
+  {
+    "name": "Deprecated Legacy Deployment",
+    "description": "Old GPT-3 deployment (deprecated)",
+    "model_provider": "openai",
+    "model_name": "gpt-3",
+    "owner": "legacy-team",
+    "owner_contact": "legacy@example.com",
+    "risk_level": "LOW",
+    "approval_status": "DEPRECATED",
+    "data_categories": ["public"],
+    "metadata": {
+      "cost_center": "CC-LEG-001",
+      "use_case": "Legacy support",
+      "deprecation_date": "2024-01-01"
+    }
+  }
+]

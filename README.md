@@ -67,9 +67,7 @@ Generate evidence for auditors and regulators:
 
 ```bash
 # Install PolicyBind
-python3 -m venv venv 
-source venv/bin/activate
-pip3 install git+https://github.com/clay-good/policybind.git
+pip install policybind
 
 # Initialize a new PolicyBind database
 policybind init

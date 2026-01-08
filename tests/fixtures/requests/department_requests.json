@@ -1,0 +1,82 @@
+[
+  {
+    "description": "Engineering user with GPT-4",
+    "request": {
+      "provider": "openai",
+      "model": "gpt-4",
+      "user_id": "eng-user-001",
+      "department": "engineering"
+    },
+    "expected_decision": "ALLOW"
+  },
+  {
+    "description": "Engineering user with expensive model",
+    "request": {
+      "provider": "openai",
+      "model": "gpt-4-turbo",
+      "user_id": "eng-user-002",
+      "department": "engineering"
+    },
+    "expected_decision": "ALLOW"
+  },
+  {
+    "description": "Finance user with GPT-3.5",
+    "request": {
+      "provider": "openai",
+      "model": "gpt-3.5-turbo",
+      "user_id": "fin-user-001",
+      "department": "finance"
+    },
+    "expected_decision": "ALLOW"
+  },
+  {
+    "description": "Finance user with GPT-4 (should be denied)",
+    "request": {
+      "provider": "openai",
+      "model": "gpt-4",
+      "user_id": "fin-user-002",
+      "department": "finance"
+    },
+    "expected_decision": "DENY"
+  },
+  {
+    "description": "Marketing user with GPT-4 (should be denied)",
+    "request": {
+      "provider": "openai",
+      "model": "gpt-4",
+      "user_id": "mkt-user-001",
+      "department": "marketing"
+    },
+    "expected_decision": "DENY"
+  },
+  {
+    "description": "Marketing user with GPT-3.5",
+    "request": {
+      "provider": "openai",
+      "model": "gpt-3.5-turbo",
+      "user_id": "mkt-user-002",
+      "department": "marketing"
+    },
+    "expected_decision": "ALLOW"
+  },
+  {
+    "description": "Research user with GPT-4",
+    "request": {
+      "provider": "openai",
+      "model": "gpt-4",
+      "user_id": "res-user-001",
+      "department": "research"
+    },
+    "expected_decision": "ALLOW"
+  },
+  {
+    "description": "HR user with DALL-E (should be denied)",
+    "request": {
+      "provider": "openai",
+      "model": "dall-e-3",
+      "user_id": "hr-user-001",
+      "department": "hr"
+    },
+    "expected_decision": "DENY"
+  }
+]

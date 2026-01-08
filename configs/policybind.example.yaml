@@ -1,0 +1,167 @@
+# PolicyBind Configuration File
+# =============================
+#
+# This file contains all available configuration options for PolicyBind.
+# Copy this file to policybind.yaml and modify as needed.
+#
+# Configuration values can be overridden by environment variables using
+# the format: POLICYBIND_SECTION_OPTION=value
+# For example: POLICYBIND_DATABASE_PATH=/data/policybind.db
+#
+# Note: Never store secrets (API keys, passwords, etc.) in this file.
+# Use environment variables for sensitive values.
+
+# Environment profile: development, staging, production, or test
+# This affects default behaviors and logging levels
+environment: development
+
+# Path to directory containing policy YAML files
+policies_path: policies
+
+# =============================================================================
+# Database Configuration
+# =============================================================================
+database:
+  # Path to SQLite database file
+  # Use ":memory:" for in-memory database (testing only)
+  path: policybind.db
+
+  # Maximum number of connections in the connection pool
+  # Higher values allow more concurrent database access
+  pool_size: 5
+
+  # Timeout in seconds for database operations
+  # Operations exceeding this will raise an error
+  timeout_seconds: 30.0
+
+# =============================================================================
+# Policy Enforcement Configuration
+# =============================================================================
+enforcement:
+  # Default action when no policy rule matches a request
+  # Options: allow, deny
+  # SECURITY: Use "deny" for production deployments
+  default_action: deny
+
+  # Whether to log all requests to the audit log
+  # Set to true for complete audit trails
+  log_all_requests: true
+
+  # Whether to require data classification on all requests
+  # When true, requests without classification are rejected
+  # SECURITY: Use true for production deployments
+  require_classification: true
+
+  # Maximum allowed prompt length in characters
+  # Requests exceeding this are rejected
+  # Set to 0 for no limit
+  max_prompt_length: 0
+
+  # Whether to allow requests when enforcement fails
+  # SECURITY: Use false (fail closed) for production
+  fail_open: false
+
+  # Maximum time in milliseconds for enforcement processing
+  # Requests exceeding this timeout will fail
+  enforcement_timeout_ms: 5000.0
+
+# =============================================================================
+# Model Registry Configuration
+# =============================================================================
+registry:
+  # Whether deployments with HIGH or CRITICAL risk require approval
+  # SECURITY: Use true for production deployments
+  require_approval_for_high_risk: true
+
+  # Whether to automatically suspend deployments that exceed violation threshold
+  auto_suspend_on_violations: true
+
+  # Number of policy violations before auto-suspension
+  # Only applies when auto_suspend_on_violations is true
+  violation_threshold: 10
+
+  # Days before a scheduled review to send reminder notifications
+  review_reminder_days: 7
+
+  # Default number of days between required reviews for deployments
+  default_review_interval_days: 90
+
+# =============================================================================
+# Access Token Configuration
+# =============================================================================
+tokens:
+  # Default number of days until a token expires
+  # Can be overridden when creating individual tokens
+  default_expiry_days: 30
+
+  # Maximum allowed token expiry in days
+  # Tokens cannot be created with longer expiry than this
+  max_expiry_days: 365
+
+  # Name of environment variable containing the token signing secret
+  # SECURITY: Never put the actual secret in this file
+  secret_key_env_var: POLICYBIND_TOKEN_SECRET
+
+  # Minimum length for generated token values
+  min_token_length: 32
+
+  # Algorithm for token hashing
+  hash_algorithm: sha256
+
+# =============================================================================
+# Logging Configuration
+# =============================================================================
+logging:
+  # Minimum log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: INFO
+
+  # Log message format (Python logging format)
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+  # Path to log file (empty for stderr only)
+  output_path: ""
+
+  # Whether to include timestamps in log output
+  include_timestamps: true
+
+  # Whether to output logs in JSON format
+  # Use true for structured logging systems
+  json_format: false
+
+# =============================================================================
+# HTTP Server Configuration
+# =============================================================================
+server:
+  # Host address to bind the server to
+  # SECURITY: Use 127.0.0.1 for local-only access
+  # Use 0.0.0.0 to accept connections from any interface
+  host: "127.0.0.1"
+
+  # Port number to listen on
+  port: 8080
+
+  # Number of worker processes for handling requests
+  workers: 4
+
+  # List of allowed CORS origins
+  # Empty list disables CORS
+  # Example: ["https://app.example.com", "https://admin.example.com"]
+  cors_origins: []
+
+  # HTTP header name for API key authentication
+  api_key_header: X-API-Key
+
+  # Rate limiting: maximum requests per window
+  rate_limit_requests: 1000
+
+  # Rate limiting: window duration in seconds
+  rate_limit_window_seconds: 60
+
+# =============================================================================
+# Custom Metadata
+# =============================================================================
+# Add any custom key-value pairs here for organization-specific needs
+metadata:
+  organization: "Example Corp"
+  # contact: "ai-governance@example.com"
+  # version: "1.0"

@@ -541,3 +541,36 @@ class TokenCreationResult:
             "token": self.token.to_dict(exclude_hash=True),
             "plaintext_token": self.plaintext_token,
         }
+
+
+@dataclass
+class TokenRotationResult:
+    """
+    Result of rotating a token.
+
+    Token rotation creates a new token value while preserving permissions
+    and other settings. The old token is revoked and a new one is issued.
+
+    Attributes:
+        old_token: The revoked old token.
+        new_token: The new Token object.
+        plaintext_token: The new plaintext token value.
+        rotated_at: When the rotation occurred.
+        rotated_by: Who performed the rotation.
+    """
+
+    old_token: Token
+    new_token: Token
+    plaintext_token: str
+    rotated_at: datetime = field(default_factory=utc_now)
+    rotated_by: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            "old_token_id": self.old_token.token_id,
+            "new_token": self.new_token.to_dict(exclude_hash=True),
+            "plaintext_token": self.plaintext_token,
+            "rotated_at": self.rotated_at.isoformat(),
+            "rotated_by": self.rotated_by,
+        }

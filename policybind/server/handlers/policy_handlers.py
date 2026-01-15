@@ -337,16 +337,16 @@ def _parse_test_request(body: dict[str, Any]) -> AIRequest:
     if missing:
         raise ValidationError(
             f"Missing required fields: {', '.join(missing)}",
-            {"missing_fields": missing},
+            details={"missing_fields": missing},
         )
 
     return AIRequest(
-        request_id=body.get("request_id"),
+        request_id=body.get("request_id", ""),
         provider=body["provider"],
         model=body["model"],
         prompt_hash=body.get("prompt_hash", ""),
         estimated_tokens=body.get("estimated_tokens", 0),
-        estimated_cost=body.get("estimated_cost"),
+        estimated_cost=body.get("estimated_cost", 0.0),
         source_application=body.get("source_application", ""),
         user_id=body.get("user_id", ""),
         department=body.get("department", ""),

@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from policybind.cli.main import CLIContext
 
 
-def register(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+def register(subparsers: argparse._SubParsersAction) -> None:
     """
     Register the status command with the parser.
 
@@ -236,7 +236,6 @@ def _get_statistics(ctx: "CLIContext") -> dict[str, Any]:
         stats["open_incidents"] = incidents_open[0]["count"] if incidents_open else 0
 
         # Get recent enforcement counts
-        one_day_ago = datetime.now().isoformat()
         enforcement = db.execute(
             "SELECT COUNT(*) as count FROM enforcement_log WHERE timestamp > datetime('now', '-1 day')"
         )

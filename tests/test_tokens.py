@@ -6,8 +6,14 @@ models for access token management and validation.
 """
 
 from datetime import datetime, time, timedelta, timezone
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from policybind.storage.database import Database
+    from policybind.storage.repositories import TokenRepository
 
 from policybind.models.request import AIRequest
 from policybind.tokens.manager import TokenEvent, TokenManager
@@ -1152,3 +1158,480 @@ class TestTokenIntegration:
             include_expired=True,
         )
         assert len(tokens) == 2
+
+
+# =============================================================================
+# Persistence Tests
+# =============================================================================
+
+
+class TestTokenPersistence:
+    """Tests for persistent token storage with TokenRepository."""
+
+    @pytest.fixture
+    def temp_db(self, tmp_path: Path) -> "Database":
+        """Create a temporary database for testing."""
+        from policybind.storage.database import Database
+
+        db_path = tmp_path / "test.db"
+        db = Database(path=str(db_path))
+        db.initialize()  # Create schema tables
+        return db
+
+    @pytest.fixture
+    def token_repository(self, temp_db: "Database") -> "TokenRepository":
+        """Create a TokenRepository with the temp database."""
+        from policybind.storage.repositories import TokenRepository
+
+        return TokenRepository(temp_db)
+
+    def test_create_token_persists_to_database(
+        self,
+        token_repository: "TokenRepository",
+    ) -> None:
+        """Test that tokens created with a repository are persisted."""
+        manager = TokenManager(repository=token_repository)
+
+        result = manager.create_token(
+            name="persistent-token",
+            subject="user@example.com",
+            description="A persistent token",
+            permissions=TokenPermissions(
+                allowed_models=["gpt-4"],
+                budget_limit=100.0,
+            ),
+            expires_in_days=30,
+            tags=["production"],
+        )
+
+        # Verify token is in memory
+        token = manager.get_token(result.token.token_id)
+        assert token is not None
+        assert token.name == "persistent-token"
+
+        # Verify token is in database by checking the repository directly
+        db_token = token_repository.get_by_hash(result.token.token_hash)
+        assert db_token is not None
+        assert db_token["subject"] == "user@example.com"
+
+    def test_manager_loads_tokens_from_database(
+        self,
+        token_repository: "TokenRepository",
+    ) -> None:
+        """Test that a new TokenManager loads existing tokens from database."""
+        # Create a token with first manager
+        manager1 = TokenManager(repository=token_repository)
+        result = manager1.create_token(
+            name="test-token",
+            subject="user@example.com",
+            description="Test description",
+            permissions=TokenPermissions(budget_limit=50.0),
+        )
+
+        token_id = result.token.token_id
+        token_hash = result.token.token_hash
+
+        # Create a new manager with same repository
+        manager2 = TokenManager(repository=token_repository)
+
+        # The token should be loaded from database
+        token = manager2.get_token(token_id)
+        assert token is not None
+        assert token.subject == "user@example.com"
+        assert token.token_hash == token_hash
+
+    def test_revoke_token_persists_to_database(
+        self,
+        token_repository: "TokenRepository",
+    ) -> None:
+        """Test that revoking a token is persisted to database."""
+        manager = TokenManager(repository=token_repository)
+
+        result = manager.create_token(
+            name="revokable-token",
+            subject="user@example.com",
+        )
+
+        # Revoke the token
+        success = manager.revoke_token(
+            result.token.token_id,
+            revoked_by="admin",
+            reason="Testing revocation",
+        )
+        assert success is True
+
+        # Verify in database
+        db_token = token_repository.get_by_id(result.token.token_id)
+        assert db_token is not None
+        assert db_token["revoked_at"] is not None
+        assert db_token["revoked_reason"] == "Testing revocation"
+
+    def test_delete_token_removes_from_database(
+        self,
+        token_repository: "TokenRepository",
+    ) -> None:
+        """Test that deleting a token removes it from database."""
+        manager = TokenManager(repository=token_repository)
+
+        result = manager.create_token(
+            name="deletable-token",
+            subject="user@example.com",
+        )
+        token_id = result.token.token_id
+
+        # Delete the token
+        success = manager.delete_token(token_id)
+        assert success is True
+
+        # Verify removed from database
+        db_token = token_repository.get_by_id(token_id)
+        assert db_token is None
+
+    def test_manager_without_repository_works_in_memory(self) -> None:
+        """Test that TokenManager works without repository (in-memory only)."""
+        manager = TokenManager()  # No repository
+
+        result = manager.create_token(
+            name="memory-only",
+            subject="user@example.com",
+        )
+
+        # Token should exist in memory
+        token = manager.get_token(result.token.token_id)
+        assert token is not None
+        assert token.name == "memory-only"
+
+        # Validate the token
+        valid_token = manager.validate_token(result.plaintext_token)
+        assert valid_token is not None
+
+    def test_extended_fields_preserved_across_reload(
+        self,
+        token_repository: "TokenRepository",
+    ) -> None:
+        """Test that extended fields (name, tags, etc.) are preserved."""
+        # Create token with extended fields
+        manager1 = TokenManager(repository=token_repository)
+        result = manager1.create_token(
+            name="extended-token",
+            subject="user@example.com",
+            subject_type="service",
+            description="Token with extended fields",
+            tags=["api", "production"],
+            issued_for="app-registration",
+            metadata={"custom_field": "custom_value"},
+        )
+
+        token_id = result.token.token_id
+
+        # Create new manager and load from database
+        manager2 = TokenManager(repository=token_repository)
+        token = manager2.get_token(token_id)
+
+        assert token is not None
+        assert token.name == "extended-token"
+        assert token.description == "Token with extended fields"
+        assert token.subject_type == "service"
+        assert token.tags == ["api", "production"]
+        assert token.issued_for == "app-registration"
+        assert token.metadata.get("custom_field") == "custom_value"
+
+    def test_permissions_preserved_across_reload(
+        self,
+        token_repository: "TokenRepository",
+    ) -> None:
+        """Test that token permissions are preserved across reload."""
+        manager1 = TokenManager(repository=token_repository)
+
+        permissions = TokenPermissions(
+            allowed_models=["gpt-4", "claude-3"],
+            denied_models=["gpt-3.5-turbo"],
+            budget_limit=200.0,
+            budget_period=BudgetPeriod.WEEKLY,
+            rate_limit=RateLimit(max_requests=100, period_seconds=60),
+        )
+
+        result = manager1.create_token(
+            name="permission-token",
+            subject="user@example.com",
+            permissions=permissions,
+        )
+
+        token_id = result.token.token_id
+
+        # Create new manager and load from database
+        manager2 = TokenManager(repository=token_repository)
+        token = manager2.get_token(token_id)
+
+        assert token is not None
+        assert token.permissions.allowed_models == ["gpt-4", "claude-3"]
+        assert token.permissions.denied_models == ["gpt-3.5-turbo"]
+        assert token.permissions.budget_limit == 200.0
+        assert token.permissions.budget_period == BudgetPeriod.WEEKLY
+        assert token.permissions.rate_limit is not None
+        assert token.permissions.rate_limit.max_requests == 100
+
+
+# =============================================================================
+# Token Rotation and Expiration Tests
+# =============================================================================
+
+
+class TestTokenRotation:
+    """Tests for token rotation functionality."""
+
+    def test_rotate_token_basic(self) -> None:
+        """Test basic token rotation."""
+        manager = TokenManager()
+
+        # Create a token
+        result = manager.create_token(
+            name="rotate-test",
+            subject="user@example.com",
+            permissions=TokenPermissions(
+                allowed_models=["gpt-4"],
+                budget_limit=100.0,
+            ),
+            expires_in_days=30,
+        )
+        old_token_id = result.token.token_id
+        old_plaintext = result.plaintext_token
+
+        # Rotate the token
+        rotation = manager.rotate_token(old_token_id, rotated_by="admin")
+
+        assert rotation is not None
+        assert rotation.old_token.token_id == old_token_id
+        assert rotation.new_token.token_id != old_token_id
+        assert rotation.plaintext_token != old_plaintext
+        assert rotation.rotated_by == "admin"
+
+        # Old token should be revoked
+        old_token = manager.get_token(old_token_id)
+        assert old_token is not None
+        assert old_token.status == TokenStatus.REVOKED
+
+        # New token should be active
+        new_token = manager.get_token(rotation.new_token.token_id)
+        assert new_token is not None
+        assert new_token.status == TokenStatus.ACTIVE
+
+    def test_rotate_token_preserves_permissions(self) -> None:
+        """Test that rotation preserves token permissions."""
+        manager = TokenManager()
+
+        permissions = TokenPermissions(
+            allowed_models=["gpt-4", "claude-3"],
+            denied_models=["gpt-3.5-turbo"],
+            budget_limit=500.0,
+            budget_period=BudgetPeriod.WEEKLY,
+            rate_limit=RateLimit(max_requests=100, period_seconds=60),
+        )
+
+        result = manager.create_token(
+            name="permission-test",
+            subject="user@example.com",
+            permissions=permissions,
+            tags=["production", "api"],
+        )
+
+        rotation = manager.rotate_token(result.token.token_id, rotated_by="admin")
+
+        assert rotation is not None
+        new_perms = rotation.new_token.permissions
+        assert new_perms.allowed_models == ["gpt-4", "claude-3"]
+        assert new_perms.denied_models == ["gpt-3.5-turbo"]
+        assert new_perms.budget_limit == 500.0
+        assert new_perms.budget_period == BudgetPeriod.WEEKLY
+        assert rotation.new_token.tags == ["production", "api"]
+
+    def test_rotate_token_with_new_expiry(self) -> None:
+        """Test rotation with explicit new expiry."""
+        manager = TokenManager()
+
+        result = manager.create_token(
+            name="expiry-test",
+            subject="user@example.com",
+            expires_in_days=10,
+        )
+
+        rotation = manager.rotate_token(
+            result.token.token_id,
+            rotated_by="admin",
+            expires_in_days=90,
+        )
+
+        assert rotation is not None
+        assert rotation.new_token.expires_at is not None
+        # New expiry should be ~90 days from now
+        remaining = rotation.new_token.time_until_expiry()
+        assert remaining is not None
+        # Allow 1 second tolerance
+        assert 89 * 86400 < remaining < 91 * 86400
+
+    def test_rotate_revoked_token_fails(self) -> None:
+        """Test that rotating a revoked token fails."""
+        manager = TokenManager()
+
+        result = manager.create_token(
+            name="revoked-test",
+            subject="user@example.com",
+        )
+
+        # Revoke the token
+        manager.revoke_token(result.token.token_id, revoked_by="admin")
+
+        # Try to rotate
+        rotation = manager.rotate_token(result.token.token_id, rotated_by="admin")
+
+        assert rotation is None
+
+    def test_rotate_nonexistent_token_fails(self) -> None:
+        """Test that rotating a nonexistent token fails."""
+        manager = TokenManager()
+
+        rotation = manager.rotate_token("nonexistent-id", rotated_by="admin")
+
+        assert rotation is None
+
+    def test_rotate_token_links_to_old(self) -> None:
+        """Test that rotated token links to old token in metadata."""
+        manager = TokenManager()
+
+        result = manager.create_token(
+            name="link-test",
+            subject="user@example.com",
+        )
+        old_token_id = result.token.token_id
+
+        rotation = manager.rotate_token(old_token_id, rotated_by="admin")
+
+        assert rotation is not None
+        assert rotation.new_token.metadata.get("rotated_from") == old_token_id
+        assert rotation.new_token.issued_for == f"rotation:{old_token_id}"
+
+
+class TestExpiringTokens:
+    """Tests for expiring tokens functionality."""
+
+    def test_list_expiring_tokens(self) -> None:
+        """Test listing tokens expiring soon."""
+        manager = TokenManager()
+
+        # Create tokens with different expiry times
+        manager.create_token(
+            name="expires-soon",
+            subject="user1@example.com",
+            expires_in_days=3,
+        )
+        manager.create_token(
+            name="expires-later",
+            subject="user2@example.com",
+            expires_in_days=6,
+        )
+        manager.create_token(
+            name="expires-far",
+            subject="user3@example.com",
+            expires_in_days=30,
+        )
+        manager.create_token(
+            name="never-expires",
+            subject="user4@example.com",
+        )
+
+        # Get tokens expiring within 7 days
+        expiring = manager.list_expiring_tokens(within_days=7)
+
+        assert len(expiring) == 2
+        assert expiring[0].name == "expires-soon"
+        assert expiring[1].name == "expires-later"
+
+    def test_list_expiring_tokens_sorted_by_expiry(self) -> None:
+        """Test that expiring tokens are sorted by expiry date."""
+        manager = TokenManager()
+
+        manager.create_token(
+            name="expires-5",
+            subject="user@example.com",
+            expires_in_days=5,
+        )
+        manager.create_token(
+            name="expires-2",
+            subject="user@example.com",
+            expires_in_days=2,
+        )
+        manager.create_token(
+            name="expires-4",
+            subject="user@example.com",
+            expires_in_days=4,
+        )
+
+        expiring = manager.list_expiring_tokens(within_days=7)
+
+        assert len(expiring) == 3
+        assert expiring[0].name == "expires-2"
+        assert expiring[1].name == "expires-4"
+        assert expiring[2].name == "expires-5"
+
+    def test_list_expiring_excludes_revoked(self) -> None:
+        """Test that revoked tokens are excluded from expiring list."""
+        manager = TokenManager()
+
+        result = manager.create_token(
+            name="revoked",
+            subject="user@example.com",
+            expires_in_days=3,
+        )
+        manager.revoke_token(result.token.token_id, revoked_by="admin")
+
+        manager.create_token(
+            name="active",
+            subject="user@example.com",
+            expires_in_days=3,
+        )
+
+        expiring = manager.list_expiring_tokens(within_days=7)
+
+        assert len(expiring) == 1
+        assert expiring[0].name == "active"
+
+    def test_get_tokens_requiring_rotation(self) -> None:
+        """Test listing tokens that should be rotated based on age."""
+        manager = TokenManager()
+
+        # Create a token and manually set its issue date to 100 days ago
+        result = manager.create_token(
+            name="old-token",
+            subject="user@example.com",
+        )
+        # Manually adjust issue date for testing
+        from policybind.models.base import utc_now
+        result.token.issued_at = utc_now() - timedelta(days=100)
+
+        manager.create_token(
+            name="new-token",
+            subject="user@example.com",
+        )
+
+        # Get tokens older than 90 days
+        candidates = manager.get_tokens_requiring_rotation(max_age_days=90)
+
+        assert len(candidates) == 1
+        assert candidates[0].name == "old-token"
+
+    def test_get_tokens_requiring_rotation_excludes_inactive(self) -> None:
+        """Test that inactive tokens are excluded from rotation candidates."""
+        manager = TokenManager()
+
+        result = manager.create_token(
+            name="old-revoked",
+            subject="user@example.com",
+        )
+        # Set old issue date and revoke
+        from policybind.models.base import utc_now
+        result.token.issued_at = utc_now() - timedelta(days=100)
+        manager.revoke_token(result.token.token_id, revoked_by="admin")
+
+        candidates = manager.get_tokens_requiring_rotation(max_age_days=90)
+
+        assert len(candidates) == 0

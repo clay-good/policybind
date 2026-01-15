@@ -5,14 +5,15 @@ This module provides the NotificationManager class for sending notifications
 about workflow events, review reminders, and other registry activities.
 """
 
+import json
+import smtplib
+import urllib.error
+import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable
-import smtplib
-import urllib.request
-import urllib.error
-import json
+from typing import Any
 
 from policybind.models.base import generate_uuid, utc_now
 

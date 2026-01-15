@@ -1,0 +1,13 @@
+{{- if .Values.policies.create }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "policybind.fullname" . }}-policies
+  labels:
+    {{- include "policybind.labels" . | nindent 4 }}
+data:
+  {{- range $name, $content := .Values.policies.content }}
+  {{ $name }}: |
+    {{- $content | nindent 4 }}
+  {{- end }}
+{{- end }}

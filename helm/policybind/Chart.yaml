@@ -1,0 +1,26 @@
+apiVersion: v2
+name: policybind
+description: AI Policy as Code Enforcement Platform for Kubernetes
+
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+
+keywords:
+  - ai
+  - policy
+  - governance
+  - enforcement
+  - security
+
+home: https://github.com/clay-good/policybind
+sources:
+  - https://github.com/clay-good/policybind
+
+maintainers:
+  - name: PolicyBind Team
+    email: team@example.com
+
+annotations:
+  category: Security
+  licenses: MIT

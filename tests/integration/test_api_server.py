@@ -47,43 +47,56 @@ def temp_db():
 def policy_set():
     """Create a policy set for testing."""
     yaml_content = """
-policies:
-  - name: allow-gpt-models
-    description: Allow GPT model access
-    rules:
-      - condition:
-          model: gpt-4
-        action:
-          type: allow
-      - condition:
-          model: gpt-3.5-turbo
-        action:
-          type: allow
+name: test-policy
+version: "1.0.0"
+description: Test policy for API server
+
+rules:
+  - name: allow-gpt-4
+    description: Allow GPT-4 model access
+    match:
+      model: gpt-4
+    action: ALLOW
+    priority: 100
+
+  - name: allow-gpt-35
+    description: Allow GPT-3.5 model access
+    match:
+      model: gpt-3.5-turbo
+    action: ALLOW
+    priority: 100
+
   - name: deny-dall-e
     description: Deny DALL-E access
-    rules:
-      - condition:
-          model: dall-e-3
-        action:
-          type: deny
-          reason: DALL-E access is restricted
+    match:
+      model: dall-e-3
+    action: DENY
+    action_params:
+      reason: DALL-E access is restricted
+    priority: 100
+
+  - name: default-deny
+    description: Deny all other requests
+    action: DENY
+    priority: 0
 """
     parser = PolicyParser()
-    return parser.parse_yaml(yaml_content)
+    result = parser.parse_string(yaml_content)
+    if result.policy_set is None:
+        raise ValueError(f"Failed to parse policy: {result.errors}")
+    return result.policy_set
 
 
 @pytest.fixture
 def enforcement_pipeline(policy_set: PolicySet, temp_db: Database):
     """Create an enforcement pipeline for testing."""
-    audit_repo = AuditRepository(temp_db)
     config = PipelineConfig(
-        enable_cost_tracking=True,
-        enable_audit_logging=True,
+        cost_tracking_enabled=True,
+        enable_audit=True,
     )
     return EnforcementPipeline(
         policy_set=policy_set,
         config=config,
-        audit_repository=audit_repo,
     )
 
 

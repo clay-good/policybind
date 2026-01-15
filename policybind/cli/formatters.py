@@ -6,7 +6,6 @@ in various formats: table, JSON, and YAML.
 """
 
 import json
-import sys
 from datetime import datetime
 from typing import Any
 
@@ -132,7 +131,7 @@ class TableFormatter:
 
         # Find longest key for alignment
         if data:
-            max_key_len = max(len(str(k)) for k in data.keys())
+            max_key_len = max(len(str(k)) for k in data)
         else:
             max_key_len = 0
 

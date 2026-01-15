@@ -5,10 +5,11 @@ This module provides the RegistryManager class for managing the lifecycle
 of AI model deployments in the registry.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
 from policybind.config.schema import RegistryConfig
 from policybind.exceptions import RegistryError, ValidationError
@@ -84,6 +85,56 @@ class DeploymentEvent:
             "actor": self.actor,
             "details": self.details,
             "metadata": self.metadata,
+        }
+
+
+@dataclass
+class BatchOperationResult:
+    """
+    Result of a batch operation on deployments.
+
+    Attributes:
+        operation: The type of operation performed.
+        total: Total number of deployments processed.
+        succeeded: Number of successful operations.
+        failed: Number of failed operations.
+        results: Individual results for each deployment.
+        errors: Error messages for failed operations.
+    """
+
+    operation: str
+    total: int = 0
+    succeeded: int = 0
+    failed: int = 0
+    results: list[dict[str, Any]] = field(default_factory=list)
+    errors: list[dict[str, Any]] = field(default_factory=list)
+
+    def add_success(self, deployment_id: str, details: dict[str, Any] | None = None) -> None:
+        """Record a successful operation."""
+        self.succeeded += 1
+        self.results.append({
+            "deployment_id": deployment_id,
+            "success": True,
+            **(details or {}),
+        })
+
+    def add_failure(self, deployment_id: str, error: str) -> None:
+        """Record a failed operation."""
+        self.failed += 1
+        self.errors.append({
+            "deployment_id": deployment_id,
+            "error": error,
+        })
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "operation": self.operation,
+            "total": self.total,
+            "succeeded": self.succeeded,
+            "failed": self.failed,
+            "results": self.results,
+            "errors": self.errors,
         }
 
 
@@ -795,6 +846,301 @@ class RegistryManager:
             "needing_review": needing_review,
             "high_risk_count": by_risk.get("HIGH", 0) + by_risk.get("CRITICAL", 0),
         }
+
+    # Batch operations
+
+    def batch_approve(
+        self,
+        deployment_ids: list[str],
+        approved_by: str,
+        approval_ticket: str = "",
+        notes: str = "",
+    ) -> BatchOperationResult:
+        """
+        Approve multiple deployments at once.
+
+        Args:
+            deployment_ids: List of deployment IDs to approve.
+            approved_by: Who is approving.
+            approval_ticket: Ticket reference (applied to all).
+            notes: Approval notes.
+
+        Returns:
+            BatchOperationResult with success/failure counts.
+        """
+        result = BatchOperationResult(operation="approve", total=len(deployment_ids))
+
+        for deployment_id in deployment_ids:
+            try:
+                deployment = self.approve(
+                    deployment_id,
+                    approved_by=approved_by,
+                    approval_ticket=approval_ticket,
+                    notes=notes,
+                )
+                result.add_success(deployment_id, {"name": deployment.name})
+            except (RegistryError, ValidationError) as e:
+                result.add_failure(deployment_id, str(e))
+
+        return result
+
+    def batch_suspend(
+        self,
+        deployment_ids: list[str],
+        suspended_by: str,
+        reason: str = "",
+    ) -> BatchOperationResult:
+        """
+        Suspend multiple deployments at once.
+
+        Args:
+            deployment_ids: List of deployment IDs to suspend.
+            suspended_by: Who is suspending.
+            reason: Suspension reason.
+
+        Returns:
+            BatchOperationResult with success/failure counts.
+        """
+        result = BatchOperationResult(operation="suspend", total=len(deployment_ids))
+
+        for deployment_id in deployment_ids:
+            try:
+                deployment = self.suspend(
+                    deployment_id,
+                    suspended_by=suspended_by,
+                    reason=reason,
+                )
+                result.add_success(deployment_id, {"name": deployment.name})
+            except RegistryError as e:
+                result.add_failure(deployment_id, str(e))
+
+        return result
+
+    def batch_reinstate(
+        self,
+        deployment_ids: list[str],
+        reinstated_by: str,
+        notes: str = "",
+    ) -> BatchOperationResult:
+        """
+        Reinstate multiple suspended deployments at once.
+
+        Args:
+            deployment_ids: List of deployment IDs to reinstate.
+            reinstated_by: Who is reinstating.
+            notes: Reinstatement notes.
+
+        Returns:
+            BatchOperationResult with success/failure counts.
+        """
+        result = BatchOperationResult(operation="reinstate", total=len(deployment_ids))
+
+        for deployment_id in deployment_ids:
+            try:
+                deployment = self.reinstate(
+                    deployment_id,
+                    reinstated_by=reinstated_by,
+                    notes=notes,
+                )
+                result.add_success(deployment_id, {"name": deployment.name})
+            except RegistryError as e:
+                result.add_failure(deployment_id, str(e))
+
+        return result
+
+    def batch_delete(
+        self,
+        deployment_ids: list[str],
+        deleted_by: str,
+    ) -> BatchOperationResult:
+        """
+        Delete multiple deployments at once.
+
+        Args:
+            deployment_ids: List of deployment IDs to delete.
+            deleted_by: Who is deleting.
+
+        Returns:
+            BatchOperationResult with success/failure counts.
+        """
+        result = BatchOperationResult(operation="delete", total=len(deployment_ids))
+
+        for deployment_id in deployment_ids:
+            try:
+                success = self.delete(deployment_id, deleted_by=deleted_by)
+                if success:
+                    result.add_success(deployment_id)
+                else:
+                    result.add_failure(deployment_id, "Deployment not found")
+            except RegistryError as e:
+                result.add_failure(deployment_id, str(e))
+
+        return result
+
+    def batch_update(
+        self,
+        deployment_ids: list[str],
+        updated_by: str,
+        **updates: Any,
+    ) -> BatchOperationResult:
+        """
+        Update multiple deployments with the same changes.
+
+        Args:
+            deployment_ids: List of deployment IDs to update.
+            updated_by: Who is making the update.
+            **updates: Fields to update on all deployments.
+
+        Returns:
+            BatchOperationResult with success/failure counts.
+        """
+        result = BatchOperationResult(operation="update", total=len(deployment_ids))
+
+        for deployment_id in deployment_ids:
+            try:
+                deployment = self.update(
+                    deployment_id,
+                    updated_by=updated_by,
+                    **updates,
+                )
+                result.add_success(deployment_id, {"name": deployment.name})
+            except (RegistryError, ValidationError) as e:
+                result.add_failure(deployment_id, str(e))
+
+        return result
+
+    def batch_review(
+        self,
+        deployment_ids: list[str],
+        reviewed_by: str,
+        next_review_days: int | None = None,
+    ) -> BatchOperationResult:
+        """
+        Mark multiple deployments as reviewed.
+
+        Args:
+            deployment_ids: List of deployment IDs to mark reviewed.
+            reviewed_by: Who performed the review.
+            next_review_days: Days until next review.
+
+        Returns:
+            BatchOperationResult with success/failure counts.
+        """
+        result = BatchOperationResult(operation="review", total=len(deployment_ids))
+
+        for deployment_id in deployment_ids:
+            try:
+                deployment = self.mark_reviewed(
+                    deployment_id,
+                    reviewed_by=reviewed_by,
+                    next_review_days=next_review_days,
+                )
+                result.add_success(deployment_id, {
+                    "name": deployment.name,
+                    "next_review_date": (
+                        deployment.next_review_date.isoformat()
+                        if deployment.next_review_date
+                        else None
+                    ),
+                })
+            except RegistryError as e:
+                result.add_failure(deployment_id, str(e))
+
+        return result
+
+    def batch_import(
+        self,
+        deployments_data: list[dict[str, Any]],
+        registered_by: str,
+        skip_validation: bool = False,
+    ) -> BatchOperationResult:
+        """
+        Import multiple deployments from data.
+
+        Args:
+            deployments_data: List of deployment dictionaries.
+            registered_by: Who is importing the deployments.
+            skip_validation: If True, skip validation for faster import.
+
+        Returns:
+            BatchOperationResult with success/failure counts.
+        """
+        result = BatchOperationResult(operation="import", total=len(deployments_data))
+
+        for idx, data in enumerate(deployments_data):
+            try:
+                # Extract required fields
+                name = data.get("name", "")
+                model_provider = data.get("model_provider", data.get("provider", ""))
+                model_name = data.get("model_name", data.get("model", ""))
+                owner = data.get("owner", "")
+                owner_contact = data.get("owner_contact", "")
+
+                if not all([name, model_provider, model_name, owner, owner_contact]):
+                    missing = []
+                    if not name:
+                        missing.append("name")
+                    if not model_provider:
+                        missing.append("model_provider")
+                    if not model_name:
+                        missing.append("model_name")
+                    if not owner:
+                        missing.append("owner")
+                    if not owner_contact:
+                        missing.append("owner_contact")
+                    result.add_failure(
+                        f"row_{idx}",
+                        f"Missing required fields: {', '.join(missing)}",
+                    )
+                    continue
+
+                # Parse risk level if provided
+                risk_level = None
+                if data.get("risk_level"):
+                    try:
+                        risk_level = RiskLevel(data["risk_level"].upper())
+                    except ValueError:
+                        pass
+
+                deployment = self.register(
+                    name=name,
+                    model_provider=model_provider,
+                    model_name=model_name,
+                    owner=owner,
+                    owner_contact=owner_contact,
+                    description=data.get("description", ""),
+                    model_version=data.get("model_version", ""),
+                    data_categories=data.get("data_categories", []),
+                    risk_level=risk_level,
+                    metadata=data.get("metadata", {}),
+                    registered_by=registered_by,
+                )
+                result.add_success(deployment.deployment_id, {"name": name})
+
+            except (RegistryError, ValidationError) as e:
+                result.add_failure(
+                    data.get("name", f"row_{idx}"),
+                    str(e),
+                )
+
+        return result
+
+    def find_by_ids(self, deployment_ids: list[str]) -> list[ModelDeployment]:
+        """
+        Find multiple deployments by their IDs.
+
+        Args:
+            deployment_ids: List of deployment IDs.
+
+        Returns:
+            List of found deployments (missing IDs are skipped).
+        """
+        deployments = []
+        for deployment_id in deployment_ids:
+            deployment = self.get(deployment_id)
+            if deployment:
+                deployments.append(deployment)
+        return deployments
 
     # Helper methods
 

@@ -6,12 +6,13 @@ the Condition interface. Conditions are composable and support complex
 logical expressions (AND, OR, NOT).
 """
 
+import re
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-import re
-from typing import Any, Callable
+from typing import Any
 
 
 class Operator(Enum):
@@ -581,9 +582,7 @@ class ConditionFactory:
 
     def _create_day_of_week_condition(self, value: Any) -> Condition:
         """Create a day-of-week condition."""
-        if isinstance(value, int):
-            return TimeCondition(day_of_week=value)
-        elif isinstance(value, list):
+        if isinstance(value, int) or isinstance(value, list):
             return TimeCondition(day_of_week=value)
         elif isinstance(value, dict):
             # Support operator syntax for day_of_week

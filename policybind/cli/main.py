@@ -15,10 +15,10 @@ Exit Codes:
 import argparse
 import logging
 import sys
-from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from policybind import __version__
+from policybind.cli.console import Console, format_error_with_code
 from policybind.exceptions import (
     ConfigurationError,
     PolicyBindError,
@@ -74,6 +74,9 @@ class CLIContext:
         self._database: Any = None
         self._logger: logging.Logger | None = None
         self._registry_repository: Any = None
+        self._token_repository: Any = None
+        self._token_manager: Any = None
+        self._console: Console | None = None
 
     @property
     def config(self) -> Any:
@@ -139,6 +142,40 @@ class CLIContext:
         return self._registry_repository
 
     @property
+    def token_repository(self) -> Any:
+        """
+        Get token repository.
+
+        Returns:
+            TokenRepository instance, or None if database not available.
+        """
+        if self._token_repository is None:
+            try:
+                from policybind.storage.repositories import TokenRepository
+
+                self._token_repository = TokenRepository(self.database)
+            except Exception:
+                # Return None if database is not available
+                pass
+        return self._token_repository
+
+    @property
+    def token_manager(self) -> Any:
+        """
+        Get token manager with optional database persistence.
+
+        Returns:
+            TokenManager instance. Uses database-backed storage if available,
+            otherwise uses in-memory storage.
+        """
+        if self._token_manager is None:
+            from policybind.tokens.manager import TokenManager
+
+            # Use repository for persistence if database is available
+            self._token_manager = TokenManager(repository=self.token_repository)
+        return self._token_manager
+
+    @property
     def logger(self) -> logging.Logger:
         """Get configured logger."""
         if self._logger is None:
@@ -156,6 +193,13 @@ class CLIContext:
                 self._logger.addHandler(handler)
 
         return self._logger
+
+    @property
+    def console(self) -> Console:
+        """Get console for styled output."""
+        if self._console is None:
+            self._console = Console(quiet=self.quiet)
+        return self._console
 
     def print(self, message: str, error: bool = False) -> None:
         """
@@ -246,7 +290,7 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _register_commands(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+def _register_commands(subparsers: argparse._SubParsersAction) -> None:
     """
     Register all command modules with the parser.
 
@@ -294,19 +338,13 @@ def run_command(
     try:
         return args.func(args, ctx)
     except ConfigurationError as e:
-        ctx.print_error(str(e))
-        if ctx.verbose and hasattr(e, "details") and e.details:
-            ctx.print_error(f"Details: {e.details}")
+        _print_policybind_error(ctx, e)
         return EXIT_CONFIG_ERROR
     except (PolicyError, ValidationError) as e:
-        ctx.print_error(str(e))
-        if ctx.verbose and hasattr(e, "details") and e.details:
-            ctx.print_error(f"Details: {e.details}")
+        _print_policybind_error(ctx, e)
         return EXIT_VALIDATION_ERROR
     except PolicyBindError as e:
-        ctx.print_error(str(e))
-        if ctx.verbose and hasattr(e, "details") and e.details:
-            ctx.print_error(f"Details: {e.details}")
+        _print_policybind_error(ctx, e)
         return EXIT_ERROR
     except KeyboardInterrupt:
         ctx.print("\nOperation cancelled.", error=True)
@@ -318,6 +356,26 @@ def run_command(
 
             traceback.print_exc()
         return EXIT_ERROR
+
+
+def _print_policybind_error(ctx: CLIContext, error: PolicyBindError) -> None:
+    """
+    Print a PolicyBind error with code and suggestion.
+
+    Args:
+        ctx: CLI context.
+        error: The error to print.
+    """
+    error_output = format_error_with_code(
+        code=error.code.value,
+        message=error.message,
+        suggestion=error.suggestion if ctx.verbose else None,
+        console=ctx.console,
+    )
+    print(error_output, file=sys.stderr)
+
+    if ctx.verbose and error.details:
+        ctx.print_error(f"Details: {error.details}")
 
 
 def main(argv: list[str] | None = None) -> int:

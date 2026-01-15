@@ -6,9 +6,10 @@ model deployment registrations for completeness and compliance.
 """
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
 from policybind.models.registry import ApprovalStatus, ModelDeployment, RiskLevel
 

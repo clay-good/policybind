@@ -1,0 +1,153 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "PolicyBind Policy",
+  "scopeName": "source.yaml.policybind",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#policy-keywords" },
+    { "include": "#action-keywords" },
+    { "include": "#operator-keywords" },
+    { "include": "#provider-values" },
+    { "include": "#classification-values" },
+    { "include": "#boolean-values" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#yaml-keys" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.policybind",
+          "match": "#.*$"
+        }
+      ]
+    },
+    "policy-keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.policybind",
+          "match": "^\\s*(name|version|description|metadata|rules|match_conditions|action|action_params|priority|enabled|tags):"
+        },
+        {
+          "name": "keyword.other.policybind",
+          "match": "^\\s*(provider|model|user_id|department|source_application|data_classification|intended_use_case|estimated_tokens|estimated_cost|time|day_of_week|hour_of_day|hour_start|hour_end):"
+        },
+        {
+          "name": "keyword.operator.logical.policybind",
+          "match": "^\\s*(and|or|not|all|any):"
+        }
+      ]
+    },
+    "action-keywords": {
+      "patterns": [
+        {
+          "name": "constant.language.action.allow.policybind",
+          "match": "\\bALLOW\\b"
+        },
+        {
+          "name": "constant.language.action.deny.policybind",
+          "match": "\\bDENY\\b"
+        },
+        {
+          "name": "constant.language.action.modify.policybind",
+          "match": "\\bMODIFY\\b"
+        },
+        {
+          "name": "constant.language.action.approval.policybind",
+          "match": "\\bREQUIRE_APPROVAL\\b"
+        },
+        {
+          "name": "constant.language.action.ratelimit.policybind",
+          "match": "\\bRATE_LIMIT\\b"
+        },
+        {
+          "name": "constant.language.action.audit.policybind",
+          "match": "\\bAUDIT\\b"
+        },
+        {
+          "name": "constant.language.action.redirect.policybind",
+          "match": "\\bREDIRECT\\b"
+        }
+      ]
+    },
+    "operator-keywords": {
+      "patterns": [
+        {
+          "name": "keyword.operator.comparison.policybind",
+          "match": "^\\s*(eq|ne|gt|gte|lt|lte|in|not_in|contains|not_contains|matches|exists|not_exists):"
+        }
+      ]
+    },
+    "provider-values": {
+      "patterns": [
+        {
+          "name": "string.unquoted.provider.policybind",
+          "match": "\\b(openai|anthropic|google|azure|aws|cohere|mistral|ollama|huggingface|bedrock)\\b"
+        }
+      ]
+    },
+    "classification-values": {
+      "patterns": [
+        {
+          "name": "string.unquoted.classification.policybind",
+          "match": "\\b(public|internal|confidential|restricted|pii|phi|financial)\\b"
+        }
+      ]
+    },
+    "boolean-values": {
+      "patterns": [
+        {
+          "name": "constant.language.boolean.true.policybind",
+          "match": "\\b(true|True|TRUE|yes|Yes|YES|on|On|ON)\\b"
+        },
+        {
+          "name": "constant.language.boolean.false.policybind",
+          "match": "\\b(false|False|FALSE|no|No|NO|off|Off|OFF)\\b"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.policybind",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.policybind",
+              "match": "\\\\."
+            }
+          ]
+        },
+        {
+          "name": "string.quoted.single.policybind",
+          "begin": "'",
+          "end": "'",
+          "patterns": [
+            {
+              "name": "constant.character.escape.policybind",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.policybind",
+          "match": "\\b-?\\d+(\\.\\d+)?\\b"
+        }
+      ]
+    },
+    "yaml-keys": {
+      "patterns": [
+        {
+          "name": "entity.name.tag.yaml.policybind",
+          "match": "^\\s*[\\w-]+(?=:)"
+        }
+      ]
+    }
+  }
+}

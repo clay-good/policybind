@@ -5,15 +5,16 @@ This module provides classes for integrating token validation with policy
 conditions, actions, and the enforcement pipeline.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
 from policybind.engine.conditions import Condition, EvaluationContext, Operator
 from policybind.models.base import utc_now
 from policybind.tokens.manager import TokenManager
-from policybind.tokens.models import Token, TokenPermissions, TokenStatus
+from policybind.tokens.models import TokenPermissions
 
 
 class TokenField(Enum):

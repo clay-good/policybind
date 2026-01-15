@@ -14,14 +14,13 @@ Usage:
 """
 
 import argparse
-import json
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from policybind.cli.main import CLIContext
 
 
-def register(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+def register(subparsers: argparse._SubParsersAction) -> None:
     """
     Register the token command with the parser.
 
@@ -225,6 +224,52 @@ def register(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[ty
     )
     unsuspend_parser.set_defaults(func=run_token_unsuspend)
 
+    # token rotate
+    rotate_parser = token_subparsers.add_parser(
+        "rotate",
+        help="Rotate a token",
+        description="Create a new token value while preserving permissions. The old token is revoked.",
+    )
+    rotate_parser.add_argument(
+        "token_id",
+        help="Token ID to rotate",
+    )
+    rotate_parser.add_argument(
+        "--expires",
+        type=int,
+        help="New expiration in days from now (default: preserve original)",
+    )
+    rotate_parser.add_argument(
+        "--no-preserve-expiry",
+        action="store_true",
+        help="Do not preserve original expiry time",
+    )
+    rotate_parser.set_defaults(func=run_token_rotate)
+
+    # token expiring
+    expiring_parser = token_subparsers.add_parser(
+        "expiring",
+        help="List expiring tokens",
+        description="List tokens that are expiring soon.",
+    )
+    expiring_parser.add_argument(
+        "--days",
+        type=int,
+        default=7,
+        help="Number of days to look ahead (default: 7)",
+    )
+    expiring_parser.add_argument(
+        "--include-expired",
+        action="store_true",
+        help="Include already expired tokens",
+    )
+    expiring_parser.add_argument(
+        "--rotation-age",
+        type=int,
+        help="Also show tokens older than N days that should be rotated",
+    )
+    expiring_parser.set_defaults(func=run_token_expiring)
+
     # token templates
     templates_parser = token_subparsers.add_parser(
         "templates",
@@ -264,12 +309,11 @@ def run_token_create(args: argparse.Namespace, ctx: "CLIContext") -> int:
     """Execute the token create command."""
     from policybind.cli.formatters import format_output
     from policybind.cli.main import EXIT_ERROR, EXIT_SUCCESS
-    from policybind.tokens.manager import TokenManager
     from policybind.tokens.models import BudgetPeriod, TokenPermissions
     from policybind.tokens.templates import get_default_registry
 
     try:
-        manager = TokenManager()
+        manager = ctx.token_manager
 
         # Build permissions
         permissions = TokenPermissions()
@@ -345,11 +389,10 @@ def run_token_list(args: argparse.Namespace, ctx: "CLIContext") -> int:
     """Execute the token list command."""
     from policybind.cli.formatters import format_output
     from policybind.cli.main import EXIT_ERROR, EXIT_SUCCESS
-    from policybind.tokens.manager import TokenManager
     from policybind.tokens.models import TokenStatus
 
     try:
-        manager = TokenManager()
+        manager = ctx.token_manager
 
         # Parse status filter
         status = None
@@ -409,10 +452,9 @@ def run_token_show(args: argparse.Namespace, ctx: "CLIContext") -> int:
     """Execute the token show command."""
     from policybind.cli.formatters import format_output
     from policybind.cli.main import EXIT_ERROR, EXIT_SUCCESS
-    from policybind.tokens.manager import TokenManager
 
     try:
-        manager = TokenManager()
+        manager = ctx.token_manager
         token = manager.get_token(args.token_id)
 
         if not token:
@@ -448,10 +490,9 @@ def run_token_revoke(args: argparse.Namespace, ctx: "CLIContext") -> int:
     """Execute the token revoke command."""
     from policybind.cli.formatters import format_output
     from policybind.cli.main import EXIT_ERROR, EXIT_SUCCESS
-    from policybind.tokens.manager import TokenManager
 
     try:
-        manager = TokenManager()
+        manager = ctx.token_manager
         token = manager.get_token(args.token_id)
 
         if not token:
@@ -495,10 +536,9 @@ def run_token_validate(args: argparse.Namespace, ctx: "CLIContext") -> int:
     """Execute the token validate command."""
     from policybind.cli.formatters import format_output
     from policybind.cli.main import EXIT_ERROR, EXIT_SUCCESS
-    from policybind.tokens.manager import TokenManager
 
     try:
-        manager = TokenManager()
+        manager = ctx.token_manager
         token = manager.validate_token(args.token_value)
 
         if not token:
@@ -553,10 +593,9 @@ def run_token_renew(args: argparse.Namespace, ctx: "CLIContext") -> int:
     """Execute the token renew command."""
     from policybind.cli.formatters import format_output
     from policybind.cli.main import EXIT_ERROR, EXIT_SUCCESS
-    from policybind.tokens.manager import TokenManager
 
     try:
-        manager = TokenManager()
+        manager = ctx.token_manager
         token = manager.renew_token(
             args.token_id,
             renewed_by="cli",
@@ -592,10 +631,9 @@ def run_token_suspend(args: argparse.Namespace, ctx: "CLIContext") -> int:
     """Execute the token suspend command."""
     from policybind.cli.formatters import format_output
     from policybind.cli.main import EXIT_ERROR, EXIT_SUCCESS
-    from policybind.tokens.manager import TokenManager
 
     try:
-        manager = TokenManager()
+        manager = ctx.token_manager
         success = manager.suspend_token(
             args.token_id,
             suspended_by="cli",
@@ -633,10 +671,9 @@ def run_token_unsuspend(args: argparse.Namespace, ctx: "CLIContext") -> int:
     """Execute the token unsuspend command."""
     from policybind.cli.formatters import format_output
     from policybind.cli.main import EXIT_ERROR, EXIT_SUCCESS
-    from policybind.tokens.manager import TokenManager
 
     try:
-        manager = TokenManager()
+        manager = ctx.token_manager
         success = manager.unsuspend_token(
             args.token_id,
             unsuspended_by="cli",
@@ -665,6 +702,158 @@ def run_token_unsuspend(args: argparse.Namespace, ctx: "CLIContext") -> int:
 
     except Exception as e:
         ctx.print_error(f"Failed to unsuspend token: {e}")
+        return EXIT_ERROR
+
+
+def run_token_rotate(args: argparse.Namespace, ctx: "CLIContext") -> int:
+    """Execute the token rotate command."""
+    from policybind.cli.formatters import format_output
+    from policybind.cli.main import EXIT_ERROR, EXIT_SUCCESS
+
+    try:
+        manager = ctx.token_manager
+
+        # Check if token exists first
+        old_token = manager.get_token(args.token_id)
+        if not old_token:
+            ctx.print_error(f"Token not found: {args.token_id}")
+            return EXIT_ERROR
+
+        # Perform rotation
+        result = manager.rotate_token(
+            args.token_id,
+            rotated_by="cli",
+            expires_in_days=args.expires,
+            preserve_expiry=not getattr(args, "no_preserve_expiry", False),
+        )
+
+        if not result:
+            ctx.print_error(f"Failed to rotate token: {args.token_id}")
+            return EXIT_ERROR
+
+        output = {
+            "old_token_id": result.old_token.token_id,
+            "new_token_id": result.new_token.token_id,
+            "new_token": result.plaintext_token,
+            "name": result.new_token.name,
+            "expires_at": (
+                result.new_token.expires_at.isoformat()
+                if result.new_token.expires_at
+                else None
+            ),
+            "message": "Token rotated successfully",
+        }
+
+        if ctx.output_format == "table":
+            ctx.print("Token rotated successfully!")
+            ctx.print("")
+            ctx.print(f"Old Token ID: {result.old_token.token_id}")
+            ctx.print("  Status: revoked")
+            ctx.print("")
+            ctx.print(f"New Token ID: {result.new_token.token_id}")
+            ctx.print(f"  Name: {result.new_token.name}")
+            if result.new_token.expires_at:
+                ctx.print(f"  Expires: {result.new_token.expires_at.isoformat()}")
+            ctx.print("")
+            ctx.print("NEW TOKEN VALUE (save this, it will not be shown again):")
+            ctx.print(f"  {result.plaintext_token}")
+        else:
+            formatted = format_output(output, ctx.output_format)
+            ctx.print(formatted)
+
+        return EXIT_SUCCESS
+
+    except Exception as e:
+        ctx.print_error(f"Failed to rotate token: {e}")
+        return EXIT_ERROR
+
+
+def run_token_expiring(args: argparse.Namespace, ctx: "CLIContext") -> int:
+    """Execute the token expiring command."""
+    from policybind.cli.formatters import format_output
+    from policybind.cli.main import EXIT_SUCCESS
+
+    try:
+        manager = ctx.token_manager
+
+        # Get expiring tokens
+        expiring_tokens = manager.list_expiring_tokens(
+            within_days=args.days,
+            include_expired=args.include_expired,
+        )
+
+        # Get tokens requiring rotation if requested
+        rotation_candidates = []
+        if args.rotation_age:
+            rotation_candidates = manager.get_tokens_requiring_rotation(
+                max_age_days=args.rotation_age,
+            )
+
+        if ctx.output_format == "table":
+            if expiring_tokens:
+                ctx.print(f"Tokens expiring within {args.days} days:")
+                ctx.print("=" * 70)
+                ctx.print("")
+                for token in expiring_tokens:
+                    remaining = token.time_until_expiry()
+                    if remaining is not None and remaining > 0:
+                        days_left = remaining / 86400  # seconds to days
+                        status = f"{days_left:.1f} days left"
+                    else:
+                        status = "EXPIRED"
+                    ctx.print(f"  {token.token_id[:12]}...  {token.name}")
+                    ctx.print(f"    Subject: {token.subject}")
+                    ctx.print(f"    Expires: {token.expires_at.isoformat() if token.expires_at else 'Never'}")
+                    ctx.print(f"    Status: {status}")
+                    ctx.print("")
+            else:
+                ctx.print(f"No tokens expiring within {args.days} days.")
+
+            if rotation_candidates:
+                ctx.print("")
+                ctx.print(f"Tokens older than {args.rotation_age} days (rotation recommended):")
+                ctx.print("=" * 70)
+                ctx.print("")
+                for token in rotation_candidates:
+                    age_days = (manager._lock and 0) or 0  # dummy to avoid lint
+                    from policybind.models.base import utc_now
+                    age = utc_now() - token.issued_at
+                    age_days = age.days
+                    ctx.print(f"  {token.token_id[:12]}...  {token.name}")
+                    ctx.print(f"    Subject: {token.subject}")
+                    ctx.print(f"    Issued: {token.issued_at.isoformat()}")
+                    ctx.print(f"    Age: {age_days} days")
+                    ctx.print("")
+        else:
+            result = {
+                "expiring_tokens": [
+                    {
+                        "token_id": t.token_id,
+                        "name": t.name,
+                        "subject": t.subject,
+                        "expires_at": t.expires_at.isoformat() if t.expires_at else None,
+                        "is_expired": t.is_expired(),
+                    }
+                    for t in expiring_tokens
+                ],
+                "rotation_candidates": [
+                    {
+                        "token_id": t.token_id,
+                        "name": t.name,
+                        "subject": t.subject,
+                        "issued_at": t.issued_at.isoformat(),
+                    }
+                    for t in rotation_candidates
+                ] if rotation_candidates else [],
+            }
+            formatted = format_output(result, ctx.output_format)
+            ctx.print(formatted)
+
+        return EXIT_SUCCESS
+
+    except Exception as e:
+        ctx.print_error(f"Failed to list expiring tokens: {e}")
+        from policybind.cli.main import EXIT_ERROR
         return EXIT_ERROR
 
 
@@ -756,10 +945,9 @@ def run_token_stats(args: argparse.Namespace, ctx: "CLIContext") -> int:
     """Execute the token stats command."""
     from policybind.cli.formatters import format_output
     from policybind.cli.main import EXIT_ERROR, EXIT_SUCCESS
-    from policybind.tokens.manager import TokenManager
 
     try:
-        manager = TokenManager()
+        manager = ctx.token_manager
         stats = manager.get_statistics()
 
         if ctx.output_format == "table":

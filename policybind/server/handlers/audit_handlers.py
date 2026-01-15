@@ -5,8 +5,8 @@ This module provides handlers for audit log query endpoints.
 """
 
 import logging
-from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from aiohttp import web
@@ -106,7 +106,7 @@ async def get_stats(request: "web.Request") -> "web.Response":
     end_str = request.query.get("end")
 
     start_date = _parse_date(start_str, default_days_ago=30)
-    end_date = _parse_date(end_str) or datetime.now(UTC)
+    end_date = _parse_date(end_str) or datetime.now(timezone.utc)
 
     if start_date is None:
         return web.json_response(
@@ -240,7 +240,7 @@ async def export_logs(request: "web.Request") -> "web.Response":
         )
 
         # Generate filename
-        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         filename = f"audit_logs_{timestamp}"
 
         if export_format == "csv":
@@ -293,7 +293,7 @@ async def export_logs(request: "web.Request") -> "web.Response":
             content = json.dumps({
                 "logs": logs,
                 "total": len(logs),
-                "exported_at": datetime.now(UTC).isoformat(),
+                "exported_at": datetime.now(timezone.utc).isoformat(),
                 "filters": {
                     "user": user_id,
                     "department": department,
@@ -333,13 +333,13 @@ def _parse_date(date_str: str | None, default_days_ago: int = 0) -> datetime | N
     """
     if date_str is None:
         if default_days_ago > 0:
-            return datetime.now(UTC) - timedelta(days=default_days_ago)
+            return datetime.now(timezone.utc) - timedelta(days=default_days_ago)
         return None
 
     # Check for relative format (e.g., '7d', '30d')
     if date_str.endswith("d") and date_str[:-1].isdigit():
         days = int(date_str[:-1])
-        return datetime.now(UTC) - timedelta(days=days)
+        return datetime.now(timezone.utc) - timedelta(days=days)
 
     # Try ISO format
     try:

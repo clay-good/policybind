@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "policybind"
-version = "0.1.0"
+version = "0.2.0"
 description = "AI Policy as Code enforcement platform for organizational AI governance"
 readme = "README.md"
 license = {text = "MIT"}
@@ -51,10 +51,10 @@ server = [
 policybind = "policybind.cli.main:main"
 
 [project.urls]
-Homepage = "https://github.com/policybind/policybind"
-Documentation = "https://github.com/policybind/policybind#readme"
-Repository = "https://github.com/policybind/policybind"
-Issues = "https://github.com/policybind/policybind/issues"
+Homepage = "https://github.com/clay-good/policybind"
+Documentation = "https://github.com/clay-good/policybind#readme"
+Repository = "https://github.com/clay-good/policybind"
+Issues = "https://github.com/clay-good/policybind/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

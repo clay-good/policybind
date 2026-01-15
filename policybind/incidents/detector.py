@@ -16,7 +16,7 @@ from policybind.incidents.models import (
     IncidentSeverity,
     IncidentType,
 )
-from policybind.models.base import generate_uuid, utc_now
+from policybind.models.base import utc_now
 
 
 @dataclass

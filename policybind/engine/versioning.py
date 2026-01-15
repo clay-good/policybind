@@ -7,9 +7,10 @@ policy versions, history, diffing, and rollback capabilities.
 
 import hashlib
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any
 
 from policybind.exceptions import PolicyError
 from policybind.models.base import generate_uuid, utc_now

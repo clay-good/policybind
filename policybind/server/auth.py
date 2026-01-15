@@ -6,15 +6,15 @@ the HTTP API, supporting API key and token-based authentication.
 """
 
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Awaitable, Callable
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from aiohttp import web
 
 from policybind.exceptions import TokenError
-
 
 logger = logging.getLogger("policybind.server.auth")
 
@@ -412,7 +412,6 @@ def create_authorization_middleware(
             return permissions[endpoint]
 
         # Try wildcard match (e.g., "GET /v1/registry/*")
-        path_parts = path.split("/")
         for pattern, roles in permissions.items():
             pattern_method, pattern_path = pattern.split(" ", 1)
             if pattern_method != method:
@@ -461,7 +460,7 @@ def create_authorization_middleware(
             error_response = {
                 "error": {
                     "type": "Forbidden",
-                    "message": f"Insufficient permissions for this operation",
+                    "message": "Insufficient permissions for this operation",
                     "request_id": request_id,
                 }
             }

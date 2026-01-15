@@ -5,10 +5,10 @@ This module provides a registry of common permission templates that can be
 used to quickly create tokens with standard permission sets.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import time
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
 from policybind.tokens.models import (
     BudgetPeriod,

@@ -657,16 +657,18 @@ async def list_templates(request: "web.Request") -> "web.Response":
     from aiohttp import web
 
     try:
-        from policybind.tokens.templates import get_all_templates
+        from policybind.tokens.templates import get_template, list_templates
 
-        templates = get_all_templates()
+        template_names = list_templates()
         results = []
-        for name, template in templates.items():
-            results.append({
-                "name": name,
-                "description": template.description,
-                "permissions": template.permissions,
-            })
+        for name in template_names:
+            template = get_template(name)
+            if template:
+                results.append({
+                    "name": name,
+                    "description": template.description,
+                    "category": template.category.value if template.category else None,
+                })
 
         return web.json_response({"templates": results, "total": len(results)})
 

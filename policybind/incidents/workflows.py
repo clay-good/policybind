@@ -11,11 +11,9 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any
 
-from policybind.exceptions import IncidentError
 from policybind.incidents.models import (
     Incident,
     IncidentSeverity,
-    IncidentStatus,
     IncidentType,
 )
 from policybind.models.base import generate_uuid, utc_now

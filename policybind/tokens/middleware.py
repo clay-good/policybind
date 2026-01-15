@@ -7,17 +7,16 @@ authorization in the policy enforcement pipeline.
 
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Callable
 
 from policybind.engine.context import EnforcementContext, PipelineStage, StageResult
 from policybind.engine.middleware import Middleware
 from policybind.models.base import generate_uuid, utc_now
 from policybind.models.request import Decision
 from policybind.tokens.manager import TokenManager
-from policybind.tokens.models import BudgetPeriod, Token, TokenPermissions, TokenUsageStats
 from policybind.tokens.validator import TokenValidator, ValidationFailureReason, ValidationResult
 
 
@@ -518,7 +517,6 @@ class TokenBudgetTracker:
             reservation.committed_amount = commit_amount
 
             # Release any unused reserved amount
-            released = reservation.amount - commit_amount
             current_reserved = self._token_reserved.get(reservation.token_id, 0.0)
             self._token_reserved[reservation.token_id] = max(0, current_reserved - reservation.amount)
 

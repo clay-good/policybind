@@ -5,13 +5,14 @@ This module provides workflow classes for managing the lifecycle of
 model deployments, including approval, review, and suspension processes.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
 from policybind.models.base import generate_uuid, utc_now
-from policybind.models.registry import ApprovalStatus, ModelDeployment, RiskLevel
+from policybind.models.registry import ModelDeployment, RiskLevel
 
 
 class ApprovalStage(Enum):

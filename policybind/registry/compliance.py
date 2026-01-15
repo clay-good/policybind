@@ -5,13 +5,14 @@ This module provides the ComplianceChecker class for checking deployments
 against various compliance frameworks and generating compliance reports.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
 from policybind.models.base import utc_now
-from policybind.models.registry import ModelDeployment, RiskLevel
+from policybind.models.registry import ModelDeployment
 
 
 class ComplianceFramework(Enum):

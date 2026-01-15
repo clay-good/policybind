@@ -6,12 +6,13 @@ implementations for request validation, classification, rate limiting,
 cost tracking, and audit logging.
 """
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from typing import Any, Callable
 import threading
 import time
+from abc import ABC, abstractmethod
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from typing import Any
 
 from policybind.engine.context import EnforcementContext, PipelineStage, StageResult
 from policybind.models.request import Decision
@@ -519,7 +520,7 @@ class CostTracker(Middleware):
                     f"User budget exceeded (spent: ${budget.spent:.2f}, limit: ${budget.limit:.2f})",
                 )
                 return self._failure_result(
-                    f"User budget exceeded",
+                    "User budget exceeded",
                     duration_ms=(time.perf_counter() - start) * 1000,
                 )
 
@@ -533,7 +534,7 @@ class CostTracker(Middleware):
                     f"Department budget exceeded (spent: ${budget.spent:.2f}, limit: ${budget.limit:.2f})",
                 )
                 return self._failure_result(
-                    f"Department budget exceeded",
+                    "Department budget exceeded",
                     duration_ms=(time.perf_counter() - start) * 1000,
                 )
 

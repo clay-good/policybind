@@ -6,10 +6,9 @@ for CRUD operations on PolicyBind data models.
 """
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Any
 
-from policybind.exceptions import StorageError
 from policybind.models.base import generate_uuid, utc_now
 from policybind.storage.database import Database
 
@@ -773,6 +772,7 @@ class TokenRepository(BaseRepository):
         issuer: str | None = None,
         expires_at: datetime | None = None,
         metadata: dict[str, Any] | None = None,
+        token_id: str | None = None,
     ) -> str:
         """
         Create a new token record.
@@ -784,12 +784,14 @@ class TokenRepository(BaseRepository):
             issuer: Who issued the token.
             expires_at: When the token expires.
             metadata: Optional metadata.
+            token_id: Optional token ID (generated if not provided).
 
         Returns:
             The token ID.
         """
         record_id = generate_uuid()
-        token_id = generate_uuid()
+        if token_id is None:
+            token_id = generate_uuid()
         now = utc_now().isoformat()
 
         self.db.execute_insert(
@@ -886,6 +888,71 @@ class TokenRepository(BaseRepository):
             )
             > 0
         )
+
+    def update_expiry(self, token_id: str, expires_at: datetime | None) -> bool:
+        """
+        Update a token's expiration date.
+
+        Args:
+            token_id: The token to update.
+            expires_at: New expiration datetime, or None for no expiry.
+
+        Returns:
+            True if the token was updated, False if not found.
+        """
+        return (
+            self.db.execute_write(
+                "UPDATE tokens SET expires_at = ? WHERE token_id = ?",
+                (self._format_datetime(expires_at), token_id),
+            )
+            > 0
+        )
+
+    def list_expiring(
+        self,
+        within_days: int = 7,
+        include_expired: bool = False,
+    ) -> list[dict[str, Any]]:
+        """
+        List tokens that are expiring soon.
+
+        Args:
+            within_days: Number of days to look ahead.
+            include_expired: If True, include already expired tokens.
+
+        Returns:
+            List of tokens expiring within the specified period.
+        """
+        now = utc_now()
+        threshold = (now + timedelta(days=within_days)).isoformat()
+        now_str = now.isoformat()
+
+        if include_expired:
+            # Include tokens already expired
+            results = self.db.execute(
+                """
+                SELECT * FROM tokens
+                WHERE revoked_at IS NULL
+                  AND expires_at IS NOT NULL
+                  AND expires_at <= ?
+                ORDER BY expires_at ASC
+                """,
+                (threshold,),
+            )
+        else:
+            # Only tokens expiring in the future
+            results = self.db.execute(
+                """
+                SELECT * FROM tokens
+                WHERE revoked_at IS NULL
+                  AND expires_at IS NOT NULL
+                  AND expires_at > ?
+                  AND expires_at <= ?
+                ORDER BY expires_at ASC
+                """,
+                (now_str, threshold),
+            )
+        return [self._deserialize_token(r) for r in results]
 
     def is_valid(self, token_hash: str) -> bool:
         """Check if a token is valid (exists, not expired, not revoked)."""

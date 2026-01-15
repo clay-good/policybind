@@ -9,14 +9,14 @@ import hashlib
 import json
 import logging
 import smtplib
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from policybind.models.base import utc_now
 from policybind.reports.generator import ReportFormat, ReportGenerator, ReportType

@@ -13,7 +13,6 @@ from typing import Any
 
 import yaml
 
-from policybind.exceptions import PolicyError
 from policybind.models.policy import PolicyRule, PolicySet
 
 
@@ -161,7 +160,7 @@ class PolicyParser:
         self._variables = variables.copy() if variables else {}
 
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 content = f.read()
             return self._parse_content(content, str(path), result)
         except OSError as e:
@@ -385,7 +384,7 @@ class PolicyParser:
 
         # Parse the included file
         try:
-            with open(full_path, "r", encoding="utf-8") as f:
+            with open(full_path, encoding="utf-8") as f:
                 content = f.read()
 
             # Parse but don't create a separate PolicySet

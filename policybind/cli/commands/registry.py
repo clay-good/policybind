@@ -13,6 +13,12 @@ Usage:
     policybind registry approve DEPLOYMENT_ID --ticket TICKET
     policybind registry compliance DEPLOYMENT_ID [--framework FRAMEWORK]
     policybind registry export [--format json|csv]
+    policybind registry stats
+    policybind registry batch-approve ID1 ID2 ... --ticket TICKET
+    policybind registry batch-suspend ID1 ID2 ... --reason REASON
+    policybind registry batch-reinstate ID1 ID2 ...
+    policybind registry batch-delete ID1 ID2 ... --force
+    policybind registry import FILE [--import-format json|csv]
 """
 
 import argparse
@@ -25,7 +31,7 @@ if TYPE_CHECKING:
     from policybind.cli.main import CLIContext
 
 
-def register(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+def register(subparsers: argparse._SubParsersAction) -> None:
     """
     Register the registry command with the parser.
 
@@ -322,6 +328,110 @@ def register(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[ty
         description="Display registry statistics and summary.",
     )
     stats_parser.set_defaults(func=run_registry_stats)
+
+    # registry batch-approve
+    batch_approve_parser = registry_subparsers.add_parser(
+        "batch-approve",
+        help="Approve multiple deployments",
+        description="Approve multiple deployments at once.",
+    )
+    batch_approve_parser.add_argument(
+        "deployment_ids",
+        nargs="+",
+        help="Deployment IDs to approve",
+    )
+    batch_approve_parser.add_argument(
+        "--ticket",
+        required=True,
+        help="Approval ticket reference",
+    )
+    batch_approve_parser.add_argument(
+        "--notes",
+        default="",
+        help="Approval notes",
+    )
+    batch_approve_parser.set_defaults(func=run_registry_batch_approve)
+
+    # registry batch-suspend
+    batch_suspend_parser = registry_subparsers.add_parser(
+        "batch-suspend",
+        help="Suspend multiple deployments",
+        description="Suspend multiple deployments at once.",
+    )
+    batch_suspend_parser.add_argument(
+        "deployment_ids",
+        nargs="+",
+        help="Deployment IDs to suspend",
+    )
+    batch_suspend_parser.add_argument(
+        "--reason",
+        required=True,
+        help="Reason for suspension",
+    )
+    batch_suspend_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Skip confirmation prompt",
+    )
+    batch_suspend_parser.set_defaults(func=run_registry_batch_suspend)
+
+    # registry batch-reinstate
+    batch_reinstate_parser = registry_subparsers.add_parser(
+        "batch-reinstate",
+        help="Reinstate multiple suspended deployments",
+        description="Reinstate multiple suspended deployments at once.",
+    )
+    batch_reinstate_parser.add_argument(
+        "deployment_ids",
+        nargs="+",
+        help="Deployment IDs to reinstate",
+    )
+    batch_reinstate_parser.add_argument(
+        "--notes",
+        default="",
+        help="Reinstatement notes",
+    )
+    batch_reinstate_parser.set_defaults(func=run_registry_batch_reinstate)
+
+    # registry batch-delete
+    batch_delete_parser = registry_subparsers.add_parser(
+        "batch-delete",
+        help="Delete multiple deployments",
+        description="Delete multiple deployments at once.",
+    )
+    batch_delete_parser.add_argument(
+        "deployment_ids",
+        nargs="+",
+        help="Deployment IDs to delete",
+    )
+    batch_delete_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Skip confirmation prompt",
+    )
+    batch_delete_parser.set_defaults(func=run_registry_batch_delete)
+
+    # registry import
+    import_parser = registry_subparsers.add_parser(
+        "import",
+        help="Import deployments from file",
+        description="Import multiple deployments from a JSON or CSV file.",
+    )
+    import_parser.add_argument(
+        "file",
+        help="Path to JSON or CSV file containing deployments",
+    )
+    import_parser.add_argument(
+        "--import-format",
+        choices=["json", "csv"],
+        help="File format (auto-detected from extension if not specified)",
+    )
+    import_parser.add_argument(
+        "--skip-validation",
+        action="store_true",
+        help="Skip validation of imported data",
+    )
+    import_parser.set_defaults(func=run_registry_import)
 
     parser.set_defaults(func=run_registry)
 
@@ -916,6 +1026,306 @@ def run_registry_stats(args: argparse.Namespace, ctx: "CLIContext") -> int:
 
     except Exception as e:
         ctx.print_error(f"Failed to get statistics: {e}")
+        return EXIT_ERROR
+
+
+def run_registry_batch_approve(args: argparse.Namespace, ctx: "CLIContext") -> int:
+    """Execute the registry batch-approve command."""
+    from policybind.cli.formatters import format_output
+    from policybind.cli.main import EXIT_ERROR, EXIT_SUCCESS
+    from policybind.registry.manager import RegistryManager
+
+    try:
+        manager = RegistryManager(repository=ctx.registry_repository)
+
+        result = manager.batch_approve(
+            deployment_ids=args.deployment_ids,
+            approved_by="cli",
+            approval_ticket=args.ticket,
+            notes=args.notes,
+        )
+
+        output_data = {
+            "operation": result.operation,
+            "total": result.total,
+            "succeeded": result.succeeded,
+            "failed": result.failed,
+            "results": result.results,
+            "errors": result.errors,
+        }
+
+        if ctx.output_format == "table":
+            ctx.print("Batch Approve Results")
+            ctx.print("=" * 40)
+            ctx.print(f"Total: {result.total}")
+            ctx.print(f"Succeeded: {result.succeeded}")
+            ctx.print(f"Failed: {result.failed}")
+            ctx.print("")
+            if result.results:
+                ctx.print("Approved:")
+                for r in result.results:
+                    ctx.print(f"  [OK] {r.get('deployment_id', 'Unknown')}: {r.get('name', 'N/A')}")
+            if result.errors:
+                ctx.print("Errors:")
+                for e in result.errors:
+                    ctx.print(f"  [X] {e.get('deployment_id', 'Unknown')}: {e.get('error', 'Unknown error')}")
+        else:
+            output = format_output(output_data, ctx.output_format)
+            ctx.print(output)
+
+        return EXIT_SUCCESS if result.failed == 0 else EXIT_ERROR
+
+    except Exception as e:
+        ctx.print_error(f"Failed to batch approve: {e}")
+        return EXIT_ERROR
+
+
+def run_registry_batch_suspend(args: argparse.Namespace, ctx: "CLIContext") -> int:
+    """Execute the registry batch-suspend command."""
+    from policybind.cli.formatters import format_output
+    from policybind.cli.main import EXIT_ERROR, EXIT_SUCCESS
+    from policybind.registry.manager import RegistryManager
+
+    try:
+        manager = RegistryManager(repository=ctx.registry_repository)
+
+        # Confirm unless --force
+        if not args.force and not ctx.quiet:
+            ctx.print(f"About to suspend {len(args.deployment_ids)} deployment(s)")
+            ctx.print(f"  Reason: {args.reason}")
+            ctx.print("")
+            ctx.print("This will block all requests to these deployments.")
+
+        result = manager.batch_suspend(
+            deployment_ids=args.deployment_ids,
+            suspended_by="cli",
+            reason=args.reason,
+        )
+
+        output_data = {
+            "operation": result.operation,
+            "total": result.total,
+            "succeeded": result.succeeded,
+            "failed": result.failed,
+            "results": result.results,
+            "errors": result.errors,
+        }
+
+        if ctx.output_format == "table":
+            ctx.print("Batch Suspend Results")
+            ctx.print("=" * 40)
+            ctx.print(f"Total: {result.total}")
+            ctx.print(f"Succeeded: {result.succeeded}")
+            ctx.print(f"Failed: {result.failed}")
+            ctx.print("")
+            if result.results:
+                ctx.print("Suspended:")
+                for r in result.results:
+                    ctx.print(f"  [SUSPENDED] {r.get('deployment_id', 'Unknown')}: {r.get('name', 'N/A')}")
+            if result.errors:
+                ctx.print("Errors:")
+                for e in result.errors:
+                    ctx.print(f"  [X] {e.get('deployment_id', 'Unknown')}: {e.get('error', 'Unknown error')}")
+        else:
+            output = format_output(output_data, ctx.output_format)
+            ctx.print(output)
+
+        return EXIT_SUCCESS if result.failed == 0 else EXIT_ERROR
+
+    except Exception as e:
+        ctx.print_error(f"Failed to batch suspend: {e}")
+        return EXIT_ERROR
+
+
+def run_registry_batch_reinstate(args: argparse.Namespace, ctx: "CLIContext") -> int:
+    """Execute the registry batch-reinstate command."""
+    from policybind.cli.formatters import format_output
+    from policybind.cli.main import EXIT_ERROR, EXIT_SUCCESS
+    from policybind.registry.manager import RegistryManager
+
+    try:
+        manager = RegistryManager(repository=ctx.registry_repository)
+
+        result = manager.batch_reinstate(
+            deployment_ids=args.deployment_ids,
+            reinstated_by="cli",
+            notes=args.notes,
+        )
+
+        output_data = {
+            "operation": result.operation,
+            "total": result.total,
+            "succeeded": result.succeeded,
+            "failed": result.failed,
+            "results": result.results,
+            "errors": result.errors,
+        }
+
+        if ctx.output_format == "table":
+            ctx.print("Batch Reinstate Results")
+            ctx.print("=" * 40)
+            ctx.print(f"Total: {result.total}")
+            ctx.print(f"Succeeded: {result.succeeded}")
+            ctx.print(f"Failed: {result.failed}")
+            ctx.print("")
+            if result.results:
+                ctx.print("Reinstated:")
+                for r in result.results:
+                    ctx.print(f"  [OK] {r.get('deployment_id', 'Unknown')}: {r.get('name', 'N/A')}")
+            if result.errors:
+                ctx.print("Errors:")
+                for e in result.errors:
+                    ctx.print(f"  [X] {e.get('deployment_id', 'Unknown')}: {e.get('error', 'Unknown error')}")
+        else:
+            output = format_output(output_data, ctx.output_format)
+            ctx.print(output)
+
+        return EXIT_SUCCESS if result.failed == 0 else EXIT_ERROR
+
+    except Exception as e:
+        ctx.print_error(f"Failed to batch reinstate: {e}")
+        return EXIT_ERROR
+
+
+def run_registry_batch_delete(args: argparse.Namespace, ctx: "CLIContext") -> int:
+    """Execute the registry batch-delete command."""
+    from policybind.cli.formatters import format_output
+    from policybind.cli.main import EXIT_ERROR, EXIT_SUCCESS
+    from policybind.registry.manager import RegistryManager
+
+    try:
+        manager = RegistryManager(repository=ctx.registry_repository)
+
+        # Confirm unless --force
+        if not args.force and not ctx.quiet:
+            ctx.print(f"About to DELETE {len(args.deployment_ids)} deployment(s)")
+            ctx.print("")
+            ctx.print("This action cannot be undone!")
+
+        result = manager.batch_delete(
+            deployment_ids=args.deployment_ids,
+            deleted_by="cli",
+        )
+
+        output_data = {
+            "operation": result.operation,
+            "total": result.total,
+            "succeeded": result.succeeded,
+            "failed": result.failed,
+            "results": result.results,
+            "errors": result.errors,
+        }
+
+        if ctx.output_format == "table":
+            ctx.print("Batch Delete Results")
+            ctx.print("=" * 40)
+            ctx.print(f"Total: {result.total}")
+            ctx.print(f"Succeeded: {result.succeeded}")
+            ctx.print(f"Failed: {result.failed}")
+            ctx.print("")
+            if result.results:
+                ctx.print("Deleted:")
+                for r in result.results:
+                    ctx.print(f"  [DELETED] {r.get('deployment_id', 'Unknown')}: {r.get('name', 'N/A')}")
+            if result.errors:
+                ctx.print("Errors:")
+                for e in result.errors:
+                    ctx.print(f"  [X] {e.get('deployment_id', 'Unknown')}: {e.get('error', 'Unknown error')}")
+        else:
+            output = format_output(output_data, ctx.output_format)
+            ctx.print(output)
+
+        return EXIT_SUCCESS if result.failed == 0 else EXIT_ERROR
+
+    except Exception as e:
+        ctx.print_error(f"Failed to batch delete: {e}")
+        return EXIT_ERROR
+
+
+def run_registry_import(args: argparse.Namespace, ctx: "CLIContext") -> int:
+    """Execute the registry import command."""
+    from policybind.cli.formatters import format_output
+    from policybind.cli.main import EXIT_ERROR, EXIT_SUCCESS
+    from policybind.registry.manager import RegistryManager
+
+    try:
+        manager = RegistryManager(repository=ctx.registry_repository)
+
+        # Determine format
+        file_path = args.file
+        import_format = args.import_format
+        if not import_format:
+            if file_path.endswith(".json"):
+                import_format = "json"
+            elif file_path.endswith(".csv"):
+                import_format = "csv"
+            else:
+                ctx.print_error("Cannot determine file format. Use --import-format to specify.")
+                return EXIT_ERROR
+
+        # Read file
+        with open(file_path) as f:
+            content = f.read()
+
+        # Parse content
+        if import_format == "json":
+            deployments_data = json.loads(content)
+            if not isinstance(deployments_data, list):
+                deployments_data = [deployments_data]
+        else:  # csv
+            reader = csv.DictReader(io.StringIO(content))
+            deployments_data = list(reader)
+            # Convert data_categories from comma-separated string to list
+            for d in deployments_data:
+                if "data_categories" in d and isinstance(d["data_categories"], str):
+                    d["data_categories"] = [c.strip() for c in d["data_categories"].split(",") if c.strip()]
+
+        result = manager.batch_import(
+            deployments_data=deployments_data,
+            registered_by="cli",
+            skip_validation=args.skip_validation,
+        )
+
+        output_data = {
+            "operation": result.operation,
+            "total": result.total,
+            "succeeded": result.succeeded,
+            "failed": result.failed,
+            "results": result.results,
+            "errors": result.errors,
+        }
+
+        if ctx.output_format == "table":
+            ctx.print("Import Results")
+            ctx.print("=" * 40)
+            ctx.print(f"File: {file_path}")
+            ctx.print(f"Format: {import_format}")
+            ctx.print(f"Total: {result.total}")
+            ctx.print(f"Succeeded: {result.succeeded}")
+            ctx.print(f"Failed: {result.failed}")
+            ctx.print("")
+            if result.results:
+                ctx.print("Imported:")
+                for r in result.results:
+                    ctx.print(f"  [OK] {r.get('deployment_id', 'Unknown')}: {r.get('name', 'N/A')}")
+            if result.errors:
+                ctx.print("Errors:")
+                for e in result.errors:
+                    ctx.print(f"  [X] {e.get('name', 'Unknown')}: {e.get('error', 'Unknown error')}")
+        else:
+            output = format_output(output_data, ctx.output_format)
+            ctx.print(output)
+
+        return EXIT_SUCCESS if result.failed == 0 else EXIT_ERROR
+
+    except FileNotFoundError:
+        ctx.print_error(f"File not found: {args.file}")
+        return EXIT_ERROR
+    except json.JSONDecodeError as e:
+        ctx.print_error(f"Invalid JSON: {e}")
+        return EXIT_ERROR
+    except Exception as e:
+        ctx.print_error(f"Failed to import: {e}")
         return EXIT_ERROR
 
 

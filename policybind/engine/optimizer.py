@@ -5,13 +5,18 @@ This module provides the MatchOptimizer class that preprocesses policies
 to create an efficient matching structure for low-latency evaluation.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from policybind.engine.conditions import Condition, ConditionFactory
-from policybind.models.policy import PolicyRule, PolicySet
+from policybind.models.policy import PolicyMatch, PolicyRule, PolicySet
 from policybind.models.request import AIRequest
+
+if TYPE_CHECKING:
+    from policybind.engine.conditions import EvaluationContext
 
 
 @dataclass
@@ -389,7 +394,7 @@ class OptimizedMatcher:
         self,
         request: AIRequest,
         current_time: datetime | None = None,
-    ) -> "PolicyMatch":
+    ) -> PolicyMatch:
         """
         Match a request using optimized structures.
 
@@ -401,7 +406,6 @@ class OptimizedMatcher:
             PolicyMatch with the matching result.
         """
         from policybind.engine.conditions import EvaluationContext
-        from policybind.models.policy import PolicyMatch
 
         # Get candidates using optimizer
         candidates = self._optimizer.get_candidates(request)
@@ -460,7 +464,7 @@ class OptimizedMatcher:
     def _collect_matched_fields(
         self,
         conditions: dict[str, Any],
-        context: "EvaluationContext",
+        context: EvaluationContext,
     ) -> dict[str, Any]:
         """Collect field values that contributed to the match."""
         matched = {}

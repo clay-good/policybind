@@ -6,10 +6,9 @@ and checking if requests are permitted under a token's permissions.
 """
 
 import fnmatch
-import re
 import threading
 from dataclasses import dataclass, field
-from datetime import datetime, time, timezone
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -17,12 +16,10 @@ from policybind.models.base import utc_now
 from policybind.models.request import AIRequest
 from policybind.tokens.manager import TokenManager
 from policybind.tokens.models import (
-    RateLimit,
     TimeWindow,
     Token,
     TokenPermissions,
     TokenStatus,
-    TokenUsageStats,
 )
 
 

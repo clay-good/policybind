@@ -124,9 +124,9 @@ async def enforce(request: "web.Request") -> "web.Response":
             "enforcement_time_ms": round(enforcement_time_ms, 2),
         }
 
-        # Add estimated cost if available
-        if response.estimated_cost is not None:
-            result["estimated_cost"] = response.estimated_cost
+        # Add estimated cost if available and non-zero
+        if ai_request.estimated_cost:
+            result["estimated_cost"] = ai_request.estimated_cost
 
         return web.json_response(result)
 
@@ -162,17 +162,17 @@ def _parse_ai_request(body: dict[str, Any]) -> AIRequest:
     if missing:
         raise ValidationError(
             f"Missing required fields: {', '.join(missing)}",
-            {"missing_fields": missing},
+            details={"missing_fields": missing},
         )
 
     # Build AIRequest
     return AIRequest(
-        request_id=body.get("request_id"),
+        request_id=body.get("request_id", ""),
         provider=body["provider"],
         model=body["model"],
         prompt_hash=body.get("prompt_hash", ""),
         estimated_tokens=body.get("estimated_tokens", 0),
-        estimated_cost=body.get("estimated_cost"),
+        estimated_cost=body.get("estimated_cost", 0.0),
         source_application=body.get("source_application", ""),
         user_id=body.get("user_id", ""),
         department=body.get("department", ""),

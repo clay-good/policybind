@@ -5,9 +5,10 @@ This module defines the available policy actions and provides an
 ActionRegistry for registering and executing action implementations.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 from policybind.exceptions import PolicyError
 
@@ -250,12 +251,12 @@ class ActionRegistry:
         """
         try:
             return Action(action_str.upper())
-        except ValueError:
+        except ValueError as e:
             valid_actions = [a.value for a in Action]
             raise PolicyError(
                 f"Invalid action: {action_str}. Valid actions: {valid_actions}",
                 details={"action": action_str, "valid_actions": valid_actions},
-            )
+            ) from e
 
     def list_actions(self) -> list[str]:
         """

@@ -9,9 +9,10 @@ import asyncio
 import logging
 import time
 from collections import defaultdict
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Awaitable, Callable
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from aiohttp import web
@@ -202,15 +203,17 @@ def create_error_handler_middleware() -> Middleware:
             error_response = {
                 "error": {
                     "type": e.__class__.__name__,
+                    "code": e.code.value,
                     "message": e.message,
                     "details": e.details,
+                    "suggestion": e.suggestion,
                     "request_id": request_id,
                 }
             }
 
             logger.warning(
-                f"PolicyBind error: {e.__class__.__name__}: {e.message}",
-                extra={"request_id": request_id, "details": e.details},
+                f"[{e.code.value}] {e.__class__.__name__}: {e.message}",
+                extra={"request_id": request_id, "error_code": e.code.value, "details": e.details},
             )
 
             return web.json_response(error_response, status=status)

@@ -312,7 +312,6 @@ class ReportGenerator:
                 # Calculate compliance score
                 total = stats.get("total_requests", 0)
                 allowed = stats.get("by_decision", {}).get("ALLOW", 0)
-                denied = stats.get("by_decision", {}).get("DENY", 0)
 
                 if total > 0:
                     # Higher score = more allowed requests (policies working as expected)

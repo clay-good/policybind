@@ -1137,3 +1137,304 @@ class TestDeploymentEvent:
         assert data["event_type"] == "registered"
         assert data["deployment_id"] == "deploy-id"
         assert data["actor"] == "user"
+
+
+# =============================================================================
+# Batch Operations Tests
+# =============================================================================
+
+
+class TestBatchOperations:
+    """Tests for batch operations in RegistryManager."""
+
+    @pytest.fixture
+    def manager(self) -> RegistryManager:
+        """Create a manager instance."""
+        return RegistryManager()
+
+    @pytest.fixture
+    def deployments(self, manager: RegistryManager) -> list[ModelDeployment]:
+        """Create multiple deployments for batch testing."""
+        deps = []
+        for i in range(5):
+            d = manager.register(
+                name=f"batch-test-{i}",
+                model_provider="openai",
+                model_name="gpt-4",
+                owner="test-team",
+                owner_contact="test@example.com",
+            )
+            deps.append(d)
+        return deps
+
+    def test_batch_approve(
+        self, manager: RegistryManager, deployments: list[ModelDeployment]
+    ) -> None:
+        """Test batch approving multiple deployments."""
+        ids = [d.deployment_id for d in deployments[:3]]
+
+        result = manager.batch_approve(
+            deployment_ids=ids,
+            approved_by="admin",
+            approval_ticket="TICKET-123",
+            notes="Batch approval test",
+        )
+
+        assert result.operation == "approve"
+        assert result.total == 3
+        assert result.succeeded == 3
+        assert result.failed == 0
+        assert len(result.results) == 3
+        assert len(result.errors) == 0
+
+        # Verify deployments are approved
+        for dep_id in ids:
+            dep = manager.get(dep_id)
+            assert dep is not None
+            assert dep.approval_status == ApprovalStatus.APPROVED
+
+    def test_batch_approve_with_invalid_id(
+        self, manager: RegistryManager, deployments: list[ModelDeployment]
+    ) -> None:
+        """Test batch approve with some invalid IDs."""
+        ids = [deployments[0].deployment_id, "invalid-id", deployments[1].deployment_id]
+
+        result = manager.batch_approve(
+            deployment_ids=ids,
+            approved_by="admin",
+            approval_ticket="TICKET-123",
+        )
+
+        assert result.total == 3
+        assert result.succeeded == 2
+        assert result.failed == 1
+        assert len(result.errors) == 1
+        assert result.errors[0]["deployment_id"] == "invalid-id"
+
+    def test_batch_suspend(
+        self, manager: RegistryManager, deployments: list[ModelDeployment]
+    ) -> None:
+        """Test batch suspending multiple deployments."""
+        # First approve them
+        for d in deployments[:3]:
+            manager.approve(d.deployment_id, "admin")
+
+        ids = [d.deployment_id for d in deployments[:3]]
+
+        result = manager.batch_suspend(
+            deployment_ids=ids,
+            suspended_by="admin",
+            reason="Security audit",
+        )
+
+        assert result.operation == "suspend"
+        assert result.total == 3
+        assert result.succeeded == 3
+        assert result.failed == 0
+
+        # Verify deployments are suspended
+        for dep_id in ids:
+            dep = manager.get(dep_id)
+            assert dep is not None
+            assert dep.approval_status == ApprovalStatus.SUSPENDED
+
+    def test_batch_reinstate(
+        self, manager: RegistryManager, deployments: list[ModelDeployment]
+    ) -> None:
+        """Test batch reinstating multiple deployments."""
+        # First approve then suspend
+        for d in deployments[:3]:
+            manager.approve(d.deployment_id, "admin")
+            manager.suspend(d.deployment_id, "admin", "Test suspension")
+
+        ids = [d.deployment_id for d in deployments[:3]]
+
+        result = manager.batch_reinstate(
+            deployment_ids=ids,
+            reinstated_by="admin",
+            notes="All clear",
+        )
+
+        assert result.operation == "reinstate"
+        assert result.total == 3
+        assert result.succeeded == 3
+        assert result.failed == 0
+
+        # Verify deployments are reinstated (back to APPROVED)
+        for dep_id in ids:
+            dep = manager.get(dep_id)
+            assert dep is not None
+            assert dep.approval_status == ApprovalStatus.APPROVED
+
+    def test_batch_delete(
+        self, manager: RegistryManager, deployments: list[ModelDeployment]
+    ) -> None:
+        """Test batch deleting multiple deployments."""
+        ids = [d.deployment_id for d in deployments[:2]]
+
+        result = manager.batch_delete(
+            deployment_ids=ids,
+            deleted_by="admin",
+        )
+
+        assert result.operation == "delete"
+        assert result.total == 2
+        assert result.succeeded == 2
+        assert result.failed == 0
+
+        # Verify deployments are deleted
+        for dep_id in ids:
+            dep = manager.get(dep_id)
+            assert dep is None
+
+        # Verify other deployments still exist
+        remaining = manager.list_all()
+        assert len(remaining) == 3
+
+    def test_batch_update(
+        self, manager: RegistryManager, deployments: list[ModelDeployment]
+    ) -> None:
+        """Test batch updating multiple deployments."""
+        ids = [d.deployment_id for d in deployments[:3]]
+
+        result = manager.batch_update(
+            deployment_ids=ids,
+            updated_by="admin",
+            description="Updated via batch",
+            owner="new-owner",
+        )
+
+        assert result.operation == "update"
+        assert result.total == 3
+        assert result.succeeded == 3
+        assert result.failed == 0
+
+        # Verify deployments are updated
+        for dep_id in ids:
+            dep = manager.get(dep_id)
+            assert dep is not None
+            assert dep.description == "Updated via batch"
+            assert dep.owner == "new-owner"
+
+    def test_batch_review(
+        self, manager: RegistryManager, deployments: list[ModelDeployment]
+    ) -> None:
+        """Test batch marking deployments as reviewed."""
+        ids = [d.deployment_id for d in deployments[:3]]
+
+        result = manager.batch_review(
+            deployment_ids=ids,
+            reviewed_by="admin",
+            next_review_days=90,
+        )
+
+        assert result.operation == "review"
+        assert result.total == 3
+        assert result.succeeded == 3
+        assert result.failed == 0
+
+        # Verify deployments have review dates
+        for dep_id in ids:
+            dep = manager.get(dep_id)
+            assert dep is not None
+            assert dep.last_review_date is not None
+            assert dep.next_review_date is not None
+
+    def test_batch_import(self, manager: RegistryManager) -> None:
+        """Test batch importing deployments from data."""
+        deployments_data = [
+            {
+                "name": "import-bot-1",
+                "model_provider": "openai",
+                "model_name": "gpt-4",
+                "owner": "team-a",
+                "owner_contact": "team-a@example.com",
+            },
+            {
+                "name": "import-bot-2",
+                "model_provider": "anthropic",
+                "model_name": "claude-3",
+                "owner": "team-b",
+                "owner_contact": "team-b@example.com",
+            },
+        ]
+
+        result = manager.batch_import(
+            deployments_data=deployments_data,
+            registered_by="importer",
+        )
+
+        assert result.operation == "import"
+        assert result.total == 2
+        assert result.succeeded == 2
+        assert result.failed == 0
+
+        # Verify deployments exist
+        all_deps = manager.list_all()
+        assert len(all_deps) == 2
+        names = {d.name for d in all_deps}
+        assert "import-bot-1" in names
+        assert "import-bot-2" in names
+
+    def test_batch_import_with_invalid_data(self, manager: RegistryManager) -> None:
+        """Test batch import with some invalid entries."""
+        deployments_data = [
+            {
+                "name": "valid-bot",
+                "model_provider": "openai",
+                "model_name": "gpt-4",
+                "owner": "team-a",
+                "owner_contact": "team-a@example.com",
+            },
+            {
+                "name": "",  # Invalid: empty name
+                "model_provider": "openai",
+                "model_name": "gpt-4",
+                "owner": "team-b",
+                "owner_contact": "team-b@example.com",
+            },
+        ]
+
+        result = manager.batch_import(
+            deployments_data=deployments_data,
+            registered_by="importer",
+        )
+
+        assert result.total == 2
+        assert result.succeeded == 1
+        assert result.failed == 1
+        assert len(result.errors) == 1
+
+    def test_find_by_ids(
+        self, manager: RegistryManager, deployments: list[ModelDeployment]
+    ) -> None:
+        """Test finding multiple deployments by IDs."""
+        ids = [d.deployment_id for d in deployments[:3]]
+
+        found = manager.find_by_ids(ids)
+
+        assert len(found) == 3
+        found_ids = {d.deployment_id for d in found}
+        assert set(ids) == found_ids
+
+    def test_find_by_ids_with_missing(
+        self, manager: RegistryManager, deployments: list[ModelDeployment]
+    ) -> None:
+        """Test finding deployments with some missing IDs."""
+        ids = [deployments[0].deployment_id, "missing-id", deployments[1].deployment_id]
+
+        found = manager.find_by_ids(ids)
+
+        assert len(found) == 2
+
+    def test_batch_empty_ids(self, manager: RegistryManager) -> None:
+        """Test batch operations with empty ID list."""
+        result = manager.batch_approve(
+            deployment_ids=[],
+            approved_by="admin",
+            approval_ticket="TICKET",
+        )
+
+        assert result.total == 0
+        assert result.succeeded == 0
+        assert result.failed == 0

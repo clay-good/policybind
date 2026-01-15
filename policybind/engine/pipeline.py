@@ -6,10 +6,9 @@ the full request lifecycle through validation, matching, action
 execution, and logging.
 """
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any
 import time
+from dataclasses import dataclass
+from enum import Enum
 
 from policybind.engine.context import (
     EnforcementContext,

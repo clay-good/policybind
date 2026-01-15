@@ -5,11 +5,12 @@ This module provides classes for integrating the model registry with policy
 conditions, actions, and the enforcement pipeline.
 """
 
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from enum import Enum
-from typing import Any, Callable
 import time
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import Any
 
 from policybind.engine.conditions import Condition, EvaluationContext, Operator
 from policybind.engine.context import EnforcementContext, PipelineStage, StageResult

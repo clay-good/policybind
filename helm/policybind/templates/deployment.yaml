@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "policybind.fullname" . }}
+  labels:
+    {{- include "policybind.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "policybind.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "policybind.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "policybind.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: POLICYBIND_DATABASE_PATH
+              value: /app/data/policybind.db
+            - name: POLICYBIND_LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            - name: POLICYBIND_LOG_FORMAT
+              value: {{ .Values.config.logFormat | quote }}
+            - name: POLICYBIND_ENFORCEMENT_DEFAULT_ACTION
+              value: {{ .Values.config.enforcement.defaultAction | quote }}
+            - name: POLICYBIND_ENFORCEMENT_LOG_ALL_REQUESTS
+              value: {{ .Values.config.enforcement.logAllRequests | quote }}
+            - name: POLICYBIND_ENFORCEMENT_REQUIRE_CLASSIFICATION
+              value: {{ .Values.config.enforcement.requireClassification | quote }}
+            - name: POLICYBIND_REGISTRY_REQUIRE_APPROVAL_FOR_HIGH_RISK
+              value: {{ .Values.config.registry.requireApprovalForHighRisk | quote }}
+            - name: POLICYBIND_REGISTRY_AUTO_SUSPEND_ON_VIOLATIONS
+              value: {{ .Values.config.registry.autoSuspendOnViolations | quote }}
+            - name: POLICYBIND_REGISTRY_VIOLATION_THRESHOLD
+              value: {{ .Values.config.registry.violationThreshold | quote }}
+            - name: POLICYBIND_TOKEN_DEFAULT_EXPIRY_DAYS
+              value: {{ .Values.config.token.defaultExpiryDays | quote }}
+            - name: POLICYBIND_TOKEN_MAX_EXPIRY_DAYS
+              value: {{ .Values.config.token.maxExpiryDays | quote }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+            - name: tmp
+              mountPath: /tmp
+            {{- if or .Values.policies.create .Values.policies.existingConfigMap }}
+            - name: policies
+              mountPath: /app/policies
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim | default (include "policybind.fullname" .) }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: tmp
+          emptyDir: {}
+        {{- if or .Values.policies.create .Values.policies.existingConfigMap }}
+        - name: policies
+          configMap:
+            name: {{ .Values.policies.existingConfigMap | default (printf "%s-policies" (include "policybind.fullname" .)) }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

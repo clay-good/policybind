@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from policybind.cli.main import CLIContext
 
 
-def register(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+def register(subparsers: argparse._SubParsersAction) -> None:
     """
     Register the config command with the parser.
 
@@ -226,7 +226,7 @@ def run_config_set(args: argparse.Namespace, ctx: "CLIContext") -> int:
 
     # Load existing config
     try:
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             config_data = yaml.safe_load(f) or {}
     except yaml.YAMLError as e:
         ctx.print_error(f"Failed to parse configuration: {e}")

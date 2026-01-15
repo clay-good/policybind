@@ -6,9 +6,10 @@ specified by matched policies, with support for action chaining,
 rollback, and async execution.
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Callable, Protocol
 import time
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from typing import Any, Protocol
 
 from policybind.engine.actions import Action, ActionRegistry, ActionResult
 from policybind.engine.context import EnforcementContext, PipelineStage, StageResult

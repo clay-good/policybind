@@ -7,8 +7,8 @@ and managing incidents related to policy violations and AI safety events.
 
 import threading
 from collections.abc import Callable
-from dataclasses import dataclass, replace
-from datetime import datetime, timedelta
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from policybind.exceptions import IncidentError
@@ -22,9 +22,8 @@ from policybind.incidents.models import (
     IncidentType,
     TimelineEventType,
 )
-from policybind.models.base import generate_uuid, utc_now
+from policybind.models.base import utc_now
 from policybind.storage import IncidentRepository
-
 
 # Type alias for incident callbacks
 IncidentCallback = Callable[["IncidentEvent"], None]
@@ -503,7 +502,7 @@ class IncidentManager:
             The updated Incident.
         """
         with self._lock:
-            incident = self.get_or_raise(incident_id)
+            self.get_or_raise(incident_id)  # Validate exists
 
             # Update resolution and root cause
             success = self._repository.set_resolution(

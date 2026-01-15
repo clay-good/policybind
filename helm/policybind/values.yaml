@@ -1,0 +1,199 @@
+# PolicyBind Helm Chart Values
+#
+# This file contains the default configuration values for the PolicyBind chart.
+# Override these values as needed for your environment.
+
+# =============================================================================
+# Global Settings
+# =============================================================================
+
+# Number of replicas for the PolicyBind server
+replicaCount: 1
+
+# Image configuration
+image:
+  repository: policybind
+  pullPolicy: IfNotPresent
+  # Overrides the image tag (default is chart appVersion)
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# =============================================================================
+# Service Account
+# =============================================================================
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use
+  name: ""
+
+# =============================================================================
+# Pod Configuration
+# =============================================================================
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+
+# =============================================================================
+# Service Configuration
+# =============================================================================
+
+service:
+  type: ClusterIP
+  port: 8080
+  annotations: {}
+
+# =============================================================================
+# Ingress Configuration
+# =============================================================================
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: policybind.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: policybind-tls
+  #    hosts:
+  #      - policybind.local
+
+# =============================================================================
+# Resource Limits
+# =============================================================================
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# =============================================================================
+# Autoscaling
+# =============================================================================
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+# =============================================================================
+# Persistence
+# =============================================================================
+
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  annotations: {}
+  # existingClaim: ""
+
+# =============================================================================
+# PolicyBind Configuration
+# =============================================================================
+
+config:
+  # Logging
+  logLevel: INFO
+  logFormat: json
+
+  # Enforcement
+  enforcement:
+    defaultAction: deny
+    logAllRequests: true
+    requireClassification: true
+
+  # Registry
+  registry:
+    requireApprovalForHighRisk: true
+    autoSuspendOnViolations: true
+    violationThreshold: 5
+
+  # Token
+  token:
+    defaultExpiryDays: 30
+    maxExpiryDays: 365
+
+# =============================================================================
+# Policies ConfigMap
+# =============================================================================
+
+# Mount policies from a ConfigMap
+policies:
+  # Create a ConfigMap with embedded policies
+  create: false
+  # Name of an existing ConfigMap containing policies
+  existingConfigMap: ""
+  # Inline policies (only used if create: true)
+  content: {}
+
+# =============================================================================
+# Health Probes
+# =============================================================================
+
+livenessProbe:
+  httpGet:
+    path: /v1/health
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /v1/health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# =============================================================================
+# Node Selection
+# =============================================================================
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# =============================================================================
+# Metrics and Monitoring
+# =============================================================================
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: false
+    namespace: ""
+    interval: 30s
+    labels: {}

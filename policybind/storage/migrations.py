@@ -6,13 +6,19 @@ the database schema between versions. Migrations are defined as
 Python functions that receive a database connection.
 """
 
+from __future__ import annotations
+
 import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Callable
+from typing import TYPE_CHECKING
 
 from policybind.exceptions import StorageError
 from policybind.storage.schema import SCHEMA_VERSION
+
+if TYPE_CHECKING:
+    from policybind.storage.database import Database
 
 
 @dataclass
@@ -52,7 +58,7 @@ class MigrationManager:
             migrator.migrate()
     """
 
-    def __init__(self, db: "Database") -> None:  # type: ignore[name-defined]
+    def __init__(self, db: Database) -> None:
         """
         Initialize the migration manager.
 

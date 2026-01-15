@@ -5,12 +5,15 @@ This module provides the TokenManager class for issuing, validating,
 and revoking access tokens for AI API authorization.
 """
 
+from __future__ import annotations
+
 import hashlib
 import secrets
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from policybind.exceptions import TokenError
 from policybind.models.base import utc_now
@@ -19,10 +22,13 @@ from policybind.tokens.models import (
     Token,
     TokenCreationResult,
     TokenPermissions,
+    TokenRotationResult,
     TokenStatus,
     TokenUsageStats,
 )
 
+if TYPE_CHECKING:
+    from policybind.storage.repositories import TokenRepository
 
 # Constants for token generation
 TOKEN_PREFIX = "pb_"
@@ -127,8 +133,15 @@ class TokenManager:
                 )
     """
 
-    def __init__(self) -> None:
-        """Initialize the token manager."""
+    def __init__(self, repository: TokenRepository | None = None) -> None:
+        """
+        Initialize the token manager.
+
+        Args:
+            repository: Optional TokenRepository for persistent storage.
+                        If not provided, tokens are stored in memory only.
+        """
+        self._repository = repository
         self._tokens: dict[str, Token] = {}
         self._token_by_hash: dict[str, str] = {}  # hash -> token_id
         self._usage_stats: dict[str, TokenUsageStats] = {}
@@ -136,6 +149,10 @@ class TokenManager:
         self._callbacks: list[TokenCallback] = []
         self._lock = threading.RLock()
         self._max_events = 10000
+
+        # If repository provided, load existing tokens into cache
+        if self._repository:
+            self._load_from_repository()
 
     def create_token(
         self,
@@ -215,6 +232,9 @@ class TokenManager:
             self._usage_stats[token.token_id] = TokenUsageStats(
                 token_id=token.token_id
             )
+
+            # Persist to repository if available
+            self._persist_token(token)
 
             # Record event
             self._add_event(TokenEvent(
@@ -307,6 +327,10 @@ class TokenManager:
             token.revoked_at = utc_now()
             token.revoked_by = revoked_by
             token.revocation_reason = reason
+
+            # Sync with repository if available
+            if self._repository:
+                self._repository.revoke(token_id, reason)
 
             self._add_event(TokenEvent(
                 event_type="revoked",
@@ -650,6 +674,10 @@ class TokenManager:
             if token.status == TokenStatus.EXPIRED:
                 token.status = TokenStatus.ACTIVE
 
+            # Persist renewal to repository if available
+            if self._repository:
+                self._repository.update_expiry(token_id, new_expires)
+
             self._add_event(TokenEvent(
                 event_type="renewed",
                 token_id=token_id,
@@ -661,6 +689,186 @@ class TokenManager:
             ))
 
             return token
+
+    def rotate_token(
+        self,
+        token_id: str,
+        rotated_by: str,
+        expires_in_days: int | None = None,
+        preserve_expiry: bool = True,
+    ) -> TokenRotationResult | None:
+        """
+        Rotate a token by revoking it and creating a new one with same permissions.
+
+        Token rotation invalidates the old token and creates a new token value
+        while preserving the permissions, subject, and other settings. This is
+        useful for security best practices like regular credential rotation.
+
+        Args:
+            token_id: The token to rotate.
+            rotated_by: Who is performing the rotation.
+            expires_in_days: New expiration period in days. If None and
+                preserve_expiry is True, uses the remaining time from old token.
+            preserve_expiry: If True and expires_in_days is None, preserves
+                the original expiry. If False, creates token with no expiry.
+
+        Returns:
+            TokenRotationResult with old and new token info, or None if not found.
+        """
+        with self._lock:
+            old_token = self._tokens.get(token_id)
+            if not old_token:
+                return None
+
+            if old_token.status == TokenStatus.REVOKED:
+                return None  # Cannot rotate revoked tokens
+
+            # Calculate new expiry
+            new_expires: datetime | None = None
+            if expires_in_days is not None:
+                new_expires = utc_now() + timedelta(days=expires_in_days)
+            elif preserve_expiry and old_token.expires_at:
+                # Preserve remaining time from original expiry
+                remaining = old_token.time_until_expiry()
+                if remaining and remaining > 0:
+                    new_expires = utc_now() + timedelta(seconds=remaining)
+                else:
+                    # Token was expired, use default 30 days
+                    new_expires = utc_now() + timedelta(days=30)
+
+        # Create new token with same settings (outside lock to avoid deadlock)
+        new_result = self.create_token(
+            name=old_token.name,
+            subject=old_token.subject,
+            permissions=old_token.permissions,
+            description=old_token.description,
+            subject_type=old_token.subject_type,
+            expires_in_days=None,  # We set it manually
+            issuer=rotated_by,
+            issued_for=f"rotation:{old_token.token_id}",
+            tags=old_token.tags.copy(),
+            metadata={
+                **old_token.metadata,
+                "rotated_from": old_token.token_id,
+            },
+        )
+
+        # Set the correct expiry
+        with self._lock:
+            new_result.token.expires_at = new_expires
+
+        # Revoke the old token
+        self.revoke_token(
+            token_id,
+            revoked_by=rotated_by,
+            reason=f"Rotated to new token: {new_result.token.token_id}",
+        )
+
+        # Record the rotation event
+        with self._lock:
+            self._add_event(TokenEvent(
+                event_type="rotated",
+                token_id=token_id,
+                actor=rotated_by,
+                details={
+                    "old_token_id": old_token.token_id,
+                    "new_token_id": new_result.token.token_id,
+                    "new_expires_at": (
+                        new_expires.isoformat() if new_expires else None
+                    ),
+                },
+            ))
+
+            # Get the now-revoked old token
+            old_token_revoked = self._tokens.get(token_id) or old_token
+
+        return TokenRotationResult(
+            old_token=old_token_revoked,
+            new_token=new_result.token,
+            plaintext_token=new_result.plaintext_token,
+            rotated_at=utc_now(),
+            rotated_by=rotated_by,
+        )
+
+    def list_expiring_tokens(
+        self,
+        within_days: int = 7,
+        include_expired: bool = False,
+    ) -> list[Token]:
+        """
+        List tokens that are expiring soon or have recently expired.
+
+        Args:
+            within_days: Number of days to look ahead for expiring tokens.
+            include_expired: If True, also include recently expired tokens.
+
+        Returns:
+            List of tokens expiring within the specified period.
+        """
+        with self._lock:
+            now = utc_now()
+            threshold = now + timedelta(days=within_days)
+            expiring: list[Token] = []
+
+            for token in self._tokens.values():
+                # Skip revoked tokens
+                if token.status == TokenStatus.REVOKED:
+                    continue
+
+                # Skip tokens without expiry
+                if token.expires_at is None:
+                    continue
+
+                # Check if token is expiring within threshold
+                if token.expires_at <= threshold:
+                    # Check if it's already expired
+                    if token.expires_at <= now:
+                        if include_expired:
+                            expiring.append(token)
+                    else:
+                        expiring.append(token)
+
+            # Sort by expiry (soonest first)
+            expiring.sort(key=lambda t: t.expires_at or now)
+
+            return expiring
+
+    def get_tokens_requiring_rotation(
+        self,
+        max_age_days: int = 90,
+    ) -> list[Token]:
+        """
+        List tokens that should be rotated based on age.
+
+        Returns active tokens that have been in use longer than the
+        specified maximum age, suggesting they should be rotated for
+        security best practices.
+
+        Args:
+            max_age_days: Maximum age in days before rotation is recommended.
+
+        Returns:
+            List of tokens that should be rotated.
+        """
+        with self._lock:
+            now = utc_now()
+            max_age = timedelta(days=max_age_days)
+            candidates: list[Token] = []
+
+            for token in self._tokens.values():
+                # Only check active tokens
+                if token.status != TokenStatus.ACTIVE:
+                    continue
+
+                # Check token age
+                age = now - token.issued_at
+                if age >= max_age:
+                    candidates.append(token)
+
+            # Sort by age (oldest first)
+            candidates.sort(key=lambda t: t.issued_at)
+
+            return candidates
 
     def update_permissions(
         self,
@@ -887,6 +1095,10 @@ class TokenManager:
             self._token_by_hash.pop(token.token_hash, None)
             self._usage_stats.pop(token_id, None)
 
+            # Sync with repository if available
+            if self._repository:
+                self._repository.delete(token_id)
+
             self._add_event(TokenEvent(
                 event_type="deleted",
                 token_id=token_id,
@@ -901,3 +1113,108 @@ class TokenManager:
             self._token_by_hash.clear()
             self._usage_stats.clear()
             self._events.clear()
+
+    def _load_from_repository(self) -> None:
+        """Load tokens from the repository into the in-memory cache."""
+        if not self._repository:
+            return
+
+        # Load all active tokens from database
+        token_rows = self._repository.list_active(limit=10000)
+
+        for row in token_rows:
+            # Convert repository format to Token model
+            token = self._token_from_row(row)
+
+            # Add to in-memory cache
+            self._tokens[token.token_id] = token
+            self._token_by_hash[token.token_hash] = token.token_id
+
+            # Initialize usage stats
+            self._usage_stats[token.token_id] = TokenUsageStats(
+                token_id=token.token_id
+            )
+
+    def _token_from_row(self, row: dict[str, Any]) -> Token:
+        """Convert a repository row to a Token object."""
+        from datetime import datetime
+
+        # Extract extended fields from metadata if present
+        metadata = row.get("metadata") or {}
+        extended = metadata.pop("_extended", {}) if isinstance(metadata, dict) else {}
+
+        # Parse permissions
+        permissions_data = row.get("permissions") or {}
+        permissions = TokenPermissions.from_dict(permissions_data)
+
+        # Determine status based on revoked_at
+        if row.get("revoked_at"):
+            status = TokenStatus.REVOKED
+        else:
+            status = TokenStatus(extended.get("status", "active"))
+
+        return Token(
+            token_id=row.get("token_id", ""),
+            token_hash=row.get("token_hash", ""),
+            name=extended.get("name", ""),
+            description=extended.get("description", ""),
+            subject=row.get("subject", ""),
+            subject_type=extended.get("subject_type", "user"),
+            permissions=permissions,
+            status=status,
+            issued_at=(
+                datetime.fromisoformat(row["issued_at"])
+                if row.get("issued_at")
+                else utc_now()
+            ),
+            expires_at=(
+                datetime.fromisoformat(row["expires_at"])
+                if row.get("expires_at")
+                else None
+            ),
+            last_used_at=(
+                datetime.fromisoformat(row["last_used_at"])
+                if row.get("last_used_at")
+                else None
+            ),
+            issuer=row.get("issuer", ""),
+            issued_for=extended.get("issued_for", ""),
+            revoked_at=(
+                datetime.fromisoformat(row["revoked_at"])
+                if row.get("revoked_at")
+                else None
+            ),
+            revoked_by=extended.get("revoked_by", ""),
+            revocation_reason=row.get("revoked_reason", ""),
+            tags=extended.get("tags", []),
+            metadata=metadata,
+        )
+
+    def _persist_token(self, token: Token) -> None:
+        """Persist a token to the repository."""
+        if not self._repository:
+            return
+
+        # Store extended fields in metadata
+        extended_metadata = {
+            "_extended": {
+                "name": token.name,
+                "description": token.description,
+                "subject_type": token.subject_type,
+                "status": token.status.value,
+                "issued_for": token.issued_for,
+                "revoked_by": token.revoked_by,
+                "tags": token.tags,
+            },
+            **token.metadata,
+        }
+
+        self._repository.create(
+            token_hash=token.token_hash,
+            subject=token.subject,
+            permissions=token.permissions.to_dict(),
+            issuer=token.issuer or None,
+            expires_at=token.expires_at,
+            metadata=extended_metadata,
+            token_id=token.token_id,
+        )

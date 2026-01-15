@@ -52,8 +52,8 @@ def get_openapi_yaml() -> str:
         import yaml
 
         return yaml.dump(get_openapi_spec(), default_flow_style=False, sort_keys=False)
-    except ImportError:
-        raise ImportError("PyYAML is required for YAML output. Install with: pip install pyyaml")
+    except ImportError as e:
+        raise ImportError("PyYAML is required for YAML output. Install with: pip install pyyaml") from e
 
 
 def _get_info() -> dict[str, Any]:
@@ -84,7 +84,7 @@ Some endpoints (health, ready, metrics) are publicly accessible.
         "version": "1.0.0",
         "contact": {
             "name": "PolicyBind Support",
-            "url": "https://github.com/policybind/policybind",
+            "url": "https://github.com/clay-good/policybind",
         },
         "license": {
             "name": "MIT",

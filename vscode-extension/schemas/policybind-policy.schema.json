@@ -1,0 +1,556 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://policybind.io/schemas/policy.json",
+  "title": "PolicyBind Policy Schema",
+  "description": "Schema for PolicyBind AI governance policy files",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Unique identifier for the policy set",
+      "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+      "examples": ["production-policies", "ai-governance", "department-restrictions"]
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic version of the policy set",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.-]+)?$",
+      "default": "1.0.0",
+      "examples": ["1.0.0", "2.1.0-beta", "1.0.0-rc.1"]
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of the policy set's purpose"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata about the policy set",
+      "properties": {
+        "author": {
+          "type": "string",
+          "description": "Author or team responsible for this policy set"
+        },
+        "owner": {
+          "type": "string",
+          "description": "Owner email or team"
+        },
+        "compliance": {
+          "type": "array",
+          "description": "Compliance frameworks this policy supports",
+          "items": {
+            "type": "string",
+            "enum": ["SOC2", "HIPAA", "GDPR", "PCI-DSS", "ISO27001", "NIST", "FedRAMP"]
+          }
+        },
+        "environment": {
+          "type": "string",
+          "description": "Target environment for this policy set",
+          "enum": ["production", "staging", "development", "test"]
+        },
+        "last_reviewed": {
+          "type": "string",
+          "format": "date",
+          "description": "Date of last policy review"
+        },
+        "review_frequency": {
+          "type": "string",
+          "description": "How often policies should be reviewed",
+          "enum": ["weekly", "monthly", "quarterly", "annually"]
+        }
+      },
+      "additionalProperties": true
+    },
+    "rules": {
+      "type": "array",
+      "description": "List of policy rules in this set",
+      "items": {
+        "$ref": "#/definitions/PolicyRule"
+      }
+    }
+  },
+  "required": ["name", "version", "rules"],
+  "definitions": {
+    "PolicyRule": {
+      "type": "object",
+      "description": "A single policy rule that defines conditions and actions",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique identifier for the rule within the policy set",
+          "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+          "examples": ["deny-pii-external", "allow-internal-gpt4", "rate-limit-expensive-models"]
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable explanation of what the rule does and why"
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether the rule is active. Disabled rules are skipped during evaluation",
+          "default": true
+        },
+        "priority": {
+          "type": "integer",
+          "description": "Numeric priority for rule ordering. Higher values = higher priority",
+          "default": 0,
+          "minimum": -1000,
+          "maximum": 1000
+        },
+        "tags": {
+          "type": "array",
+          "description": "Tags for categorizing and filtering rules",
+          "items": {
+            "type": "string"
+          },
+          "examples": [["production", "pii", "compliance"], ["security", "audit"]]
+        },
+        "match_conditions": {
+          "$ref": "#/definitions/MatchConditions"
+        },
+        "action": {
+          "type": "string",
+          "description": "The action to take when the rule matches",
+          "enum": ["ALLOW", "DENY", "MODIFY", "REQUIRE_APPROVAL", "RATE_LIMIT", "AUDIT", "REDIRECT"],
+          "enumDescriptions": [
+            "Allow the request to proceed",
+            "Block the request",
+            "Allow but modify the request (e.g., redact PII)",
+            "Queue for human approval",
+            "Apply rate limiting",
+            "Log for audit without blocking",
+            "Redirect to a different model/provider"
+          ]
+        },
+        "action_params": {
+          "$ref": "#/definitions/ActionParams"
+        }
+      },
+      "required": ["name", "action"],
+      "additionalProperties": false
+    },
+    "MatchConditions": {
+      "type": "object",
+      "description": "Conditions that determine when this rule applies",
+      "properties": {
+        "provider": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "AI provider to match",
+              "enum": ["openai", "anthropic", "google", "azure", "aws", "cohere", "mistral", "ollama", "huggingface"]
+            },
+            {
+              "$ref": "#/definitions/OperatorCondition"
+            }
+          ]
+        },
+        "model": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Model name to match (exact match)"
+            },
+            {
+              "$ref": "#/definitions/OperatorCondition"
+            }
+          ]
+        },
+        "user_id": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "User identifier to match"
+            },
+            {
+              "$ref": "#/definitions/OperatorCondition"
+            }
+          ]
+        },
+        "department": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Department to match",
+              "examples": ["engineering", "marketing", "legal", "hr", "finance"]
+            },
+            {
+              "$ref": "#/definitions/OperatorCondition"
+            }
+          ]
+        },
+        "source_application": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Application identifier to match"
+            },
+            {
+              "$ref": "#/definitions/OperatorCondition"
+            }
+          ]
+        },
+        "data_classification": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Data classification to match",
+              "enum": ["public", "internal", "confidential", "restricted", "pii", "phi", "financial"]
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "$ref": "#/definitions/OperatorCondition"
+            }
+          ]
+        },
+        "intended_use_case": {
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Intended use case to match"
+            },
+            {
+              "$ref": "#/definitions/OperatorCondition"
+            }
+          ]
+        },
+        "estimated_tokens": {
+          "$ref": "#/definitions/NumericCondition"
+        },
+        "estimated_cost": {
+          "$ref": "#/definitions/NumericCondition"
+        },
+        "time": {
+          "$ref": "#/definitions/TimeCondition"
+        },
+        "day_of_week": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 6,
+              "description": "Day of week (0=Monday, 6=Sunday)"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 6
+              }
+            },
+            {
+              "$ref": "#/definitions/OperatorCondition"
+            }
+          ]
+        },
+        "hour_of_day": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 23,
+              "description": "Hour of day (0-23)"
+            },
+            {
+              "$ref": "#/definitions/NumericCondition"
+            }
+          ]
+        },
+        "and": {
+          "type": "array",
+          "description": "All conditions must match (AND logic)",
+          "items": {
+            "$ref": "#/definitions/MatchConditions"
+          }
+        },
+        "all": {
+          "type": "array",
+          "description": "Alias for 'and' - all conditions must match",
+          "items": {
+            "$ref": "#/definitions/MatchConditions"
+          }
+        },
+        "or": {
+          "type": "array",
+          "description": "At least one condition must match (OR logic)",
+          "items": {
+            "$ref": "#/definitions/MatchConditions"
+          }
+        },
+        "any": {
+          "type": "array",
+          "description": "Alias for 'or' - at least one condition must match",
+          "items": {
+            "$ref": "#/definitions/MatchConditions"
+          }
+        },
+        "not": {
+          "$ref": "#/definitions/MatchConditions",
+          "description": "Negate the nested condition"
+        }
+      },
+      "additionalProperties": true
+    },
+    "OperatorCondition": {
+      "type": "object",
+      "description": "Condition with comparison operator",
+      "properties": {
+        "eq": {
+          "description": "Equals"
+        },
+        "ne": {
+          "description": "Not equals"
+        },
+        "gt": {
+          "type": "number",
+          "description": "Greater than"
+        },
+        "gte": {
+          "type": "number",
+          "description": "Greater than or equal"
+        },
+        "lt": {
+          "type": "number",
+          "description": "Less than"
+        },
+        "lte": {
+          "type": "number",
+          "description": "Less than or equal"
+        },
+        "in": {
+          "type": "array",
+          "description": "Value is in list"
+        },
+        "not_in": {
+          "type": "array",
+          "description": "Value is not in list"
+        },
+        "contains": {
+          "description": "Contains substring or element"
+        },
+        "not_contains": {
+          "description": "Does not contain"
+        },
+        "matches": {
+          "type": "string",
+          "description": "Matches regex pattern"
+        },
+        "exists": {
+          "type": "boolean",
+          "description": "Field exists"
+        },
+        "not_exists": {
+          "type": "boolean",
+          "description": "Field does not exist"
+        }
+      },
+      "additionalProperties": false
+    },
+    "NumericCondition": {
+      "type": "object",
+      "description": "Numeric comparison condition",
+      "properties": {
+        "eq": {
+          "type": "number",
+          "description": "Equals"
+        },
+        "ne": {
+          "type": "number",
+          "description": "Not equals"
+        },
+        "gt": {
+          "type": "number",
+          "description": "Greater than"
+        },
+        "gte": {
+          "type": "number",
+          "description": "Greater than or equal"
+        },
+        "lt": {
+          "type": "number",
+          "description": "Less than"
+        },
+        "lte": {
+          "type": "number",
+          "description": "Less than or equal"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TimeCondition": {
+      "type": "object",
+      "description": "Time-based condition",
+      "properties": {
+        "day_of_week": {
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 6
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 6
+              }
+            }
+          ],
+          "description": "Day of week (0=Monday, 6=Sunday)"
+        },
+        "hour_start": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 23,
+          "description": "Start hour (0-23)"
+        },
+        "hour_end": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 23,
+          "description": "End hour (0-23)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ActionParams": {
+      "type": "object",
+      "description": "Parameters for the action",
+      "properties": {
+        "reason": {
+          "type": "string",
+          "description": "Human-readable reason for the action (shown to users)"
+        },
+        "redirect_to": {
+          "type": "object",
+          "description": "Redirect configuration (for REDIRECT action)",
+          "properties": {
+            "provider": {
+              "type": "string",
+              "description": "Target provider"
+            },
+            "model": {
+              "type": "string",
+              "description": "Target model"
+            }
+          }
+        },
+        "rate_limit": {
+          "type": "object",
+          "description": "Rate limit configuration (for RATE_LIMIT action)",
+          "properties": {
+            "requests_per_minute": {
+              "type": "integer",
+              "description": "Maximum requests per minute"
+            },
+            "requests_per_hour": {
+              "type": "integer",
+              "description": "Maximum requests per hour"
+            },
+            "requests_per_day": {
+              "type": "integer",
+              "description": "Maximum requests per day"
+            },
+            "tokens_per_minute": {
+              "type": "integer",
+              "description": "Maximum tokens per minute"
+            },
+            "tokens_per_day": {
+              "type": "integer",
+              "description": "Maximum tokens per day"
+            },
+            "cost_per_day": {
+              "type": "number",
+              "description": "Maximum cost per day in USD"
+            }
+          }
+        },
+        "modifications": {
+          "type": "object",
+          "description": "Modification configuration (for MODIFY action)",
+          "properties": {
+            "redact_pii": {
+              "type": "boolean",
+              "description": "Redact PII from requests"
+            },
+            "redact_fields": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Fields to redact"
+            },
+            "truncate_to": {
+              "type": "integer",
+              "description": "Truncate input to this many tokens"
+            },
+            "inject_system_prompt": {
+              "type": "string",
+              "description": "System prompt to inject"
+            }
+          }
+        },
+        "approval": {
+          "type": "object",
+          "description": "Approval configuration (for REQUIRE_APPROVAL action)",
+          "properties": {
+            "approvers": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of approver emails or groups"
+            },
+            "timeout_hours": {
+              "type": "integer",
+              "description": "Hours until approval request expires"
+            },
+            "auto_deny_on_timeout": {
+              "type": "boolean",
+              "description": "Automatically deny if approval times out"
+            }
+          }
+        },
+        "audit": {
+          "type": "object",
+          "description": "Audit configuration (for AUDIT action)",
+          "properties": {
+            "log_full_request": {
+              "type": "boolean",
+              "description": "Log full request content"
+            },
+            "log_response": {
+              "type": "boolean",
+              "description": "Log response content"
+            },
+            "alert": {
+              "type": "boolean",
+              "description": "Send alert notification"
+            },
+            "alert_channels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Channels to send alerts to"
+            }
+          }
+        },
+        "notify": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Email addresses or channels to notify"
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

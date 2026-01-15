@@ -1,0 +1,328 @@
+{
+  "PolicyBind Policy Set": {
+    "prefix": ["policyset", "pbset", "policy-set"],
+    "description": "Create a new PolicyBind policy set",
+    "body": [
+      "name: ${1:my-policy-set}",
+      "version: ${2:1.0.0}",
+      "description: ${3:Description of this policy set}",
+      "metadata:",
+      "  author: ${4:your-team}",
+      "  environment: ${5|production,staging,development,test|}",
+      "rules:",
+      "  - name: ${6:rule-name}",
+      "    description: ${7:Rule description}",
+      "    priority: ${8:100}",
+      "    enabled: true",
+      "    match_conditions:",
+      "      ${9:provider}: ${10:openai}",
+      "    action: ${11|ALLOW,DENY,MODIFY,REQUIRE_APPROVAL,RATE_LIMIT,AUDIT|}",
+      "    action_params:",
+      "      reason: ${12:Reason for this action}",
+      "$0"
+    ]
+  },
+  "PolicyBind Rule": {
+    "prefix": ["pbrule", "rule", "policy-rule"],
+    "description": "Create a new PolicyBind rule",
+    "body": [
+      "- name: ${1:rule-name}",
+      "  description: ${2:Rule description}",
+      "  priority: ${3:100}",
+      "  enabled: true",
+      "  match_conditions:",
+      "    ${4:provider}: ${5:openai}",
+      "  action: ${6|ALLOW,DENY,MODIFY,REQUIRE_APPROVAL,RATE_LIMIT,AUDIT|}",
+      "  action_params:",
+      "    reason: ${7:Reason for this action}",
+      "$0"
+    ]
+  },
+  "Deny Rule": {
+    "prefix": ["pbdeny", "deny-rule"],
+    "description": "Create a deny rule",
+    "body": [
+      "- name: deny-${1:condition}",
+      "  description: Deny requests that ${2:match condition}",
+      "  priority: ${3:100}",
+      "  enabled: true",
+      "  match_conditions:",
+      "    ${4:field}:",
+      "      ${5|eq,ne,contains,matches,in|}: ${6:value}",
+      "  action: DENY",
+      "  action_params:",
+      "    reason: ${7:Access denied}",
+      "$0"
+    ]
+  },
+  "Allow Rule": {
+    "prefix": ["pballow", "allow-rule"],
+    "description": "Create an allow rule",
+    "body": [
+      "- name: allow-${1:condition}",
+      "  description: Allow requests that ${2:match condition}",
+      "  priority: ${3:50}",
+      "  enabled: true",
+      "  match_conditions:",
+      "    ${4:field}: ${5:value}",
+      "  action: ALLOW",
+      "$0"
+    ]
+  },
+  "Rate Limit Rule": {
+    "prefix": ["pbratelimit", "rate-limit-rule"],
+    "description": "Create a rate limiting rule",
+    "body": [
+      "- name: rate-limit-${1:target}",
+      "  description: Rate limit for ${2:specific users/models}",
+      "  priority: ${3:80}",
+      "  enabled: true",
+      "  match_conditions:",
+      "    ${4:field}: ${5:value}",
+      "  action: RATE_LIMIT",
+      "  action_params:",
+      "    rate_limit:",
+      "      requests_per_minute: ${6:10}",
+      "      requests_per_hour: ${7:100}",
+      "      cost_per_day: ${8:10.00}",
+      "$0"
+    ]
+  },
+  "Require Approval Rule": {
+    "prefix": ["pbapproval", "approval-rule"],
+    "description": "Create a rule requiring approval",
+    "body": [
+      "- name: require-approval-${1:condition}",
+      "  description: Require approval for ${2:sensitive operations}",
+      "  priority: ${3:90}",
+      "  enabled: true",
+      "  match_conditions:",
+      "    ${4:field}: ${5:value}",
+      "  action: REQUIRE_APPROVAL",
+      "  action_params:",
+      "    reason: This request requires manager approval",
+      "    approval:",
+      "      approvers:",
+      "        - ${6:manager@example.com}",
+      "      timeout_hours: ${7:24}",
+      "      auto_deny_on_timeout: ${8|true,false|}",
+      "$0"
+    ]
+  },
+  "Modify Rule (PII Redaction)": {
+    "prefix": ["pbmodify", "modify-rule", "redact-pii"],
+    "description": "Create a rule that modifies requests (e.g., PII redaction)",
+    "body": [
+      "- name: redact-pii-${1:target}",
+      "  description: Redact PII before sending to ${2:external models}",
+      "  priority: ${3:95}",
+      "  enabled: true",
+      "  match_conditions:",
+      "    data_classification:",
+      "      contains: pii",
+      "  action: MODIFY",
+      "  action_params:",
+      "    modifications:",
+      "      redact_pii: true",
+      "      redact_fields:",
+      "        - ${4:ssn}",
+      "        - ${5:email}",
+      "$0"
+    ]
+  },
+  "Audit Rule": {
+    "prefix": ["pbaudit", "audit-rule"],
+    "description": "Create an audit logging rule",
+    "body": [
+      "- name: audit-${1:target}",
+      "  description: Audit ${2:specific requests} without blocking",
+      "  priority: ${3:10}",
+      "  enabled: true",
+      "  match_conditions:",
+      "    ${4:field}: ${5:value}",
+      "  action: AUDIT",
+      "  action_params:",
+      "    audit:",
+      "      log_full_request: ${6|true,false|}",
+      "      log_response: ${7|false,true|}",
+      "      alert: ${8|false,true|}",
+      "$0"
+    ]
+  },
+  "Provider Match": {
+    "prefix": ["pbprovider", "match-provider"],
+    "description": "Match by AI provider",
+    "body": [
+      "provider: ${1|openai,anthropic,google,azure,aws,cohere,mistral,ollama|}"
+    ]
+  },
+  "Model Match": {
+    "prefix": ["pbmodel", "match-model"],
+    "description": "Match by model name",
+    "body": [
+      "model:",
+      "  ${1|eq,contains,matches,in|}: ${2:gpt-4}"
+    ]
+  },
+  "Department Match": {
+    "prefix": ["pbdept", "match-department"],
+    "description": "Match by department",
+    "body": [
+      "department: ${1|engineering,marketing,sales,hr,finance,legal,operations|}"
+    ]
+  },
+  "Data Classification Match": {
+    "prefix": ["pbdata", "match-classification"],
+    "description": "Match by data classification",
+    "body": [
+      "data_classification:",
+      "  ${1|contains,eq,in|}: ${2|pii,phi,financial,confidential,internal,public|}"
+    ]
+  },
+  "Cost Threshold Match": {
+    "prefix": ["pbcost", "match-cost"],
+    "description": "Match by estimated cost",
+    "body": [
+      "estimated_cost:",
+      "  ${1|gt,gte,lt,lte|}: ${2:1.00}"
+    ]
+  },
+  "Token Threshold Match": {
+    "prefix": ["pbtokens", "match-tokens"],
+    "description": "Match by estimated tokens",
+    "body": [
+      "estimated_tokens:",
+      "  ${1|gt,gte,lt,lte|}: ${2:10000}"
+    ]
+  },
+  "Time-Based Match": {
+    "prefix": ["pbtime", "match-time"],
+    "description": "Match by time of day",
+    "body": [
+      "time:",
+      "  day_of_week: [${1:0, 1, 2, 3, 4}]  # Monday-Friday",
+      "  hour_start: ${2:9}",
+      "  hour_end: ${3:17}"
+    ]
+  },
+  "AND Conditions": {
+    "prefix": ["pband", "and-conditions"],
+    "description": "Combine conditions with AND logic",
+    "body": [
+      "and:",
+      "  - ${1:field1}: ${2:value1}",
+      "  - ${3:field2}: ${4:value2}"
+    ]
+  },
+  "OR Conditions": {
+    "prefix": ["pbor", "or-conditions"],
+    "description": "Combine conditions with OR logic",
+    "body": [
+      "or:",
+      "  - ${1:field1}: ${2:value1}",
+      "  - ${3:field2}: ${4:value2}"
+    ]
+  },
+  "NOT Condition": {
+    "prefix": ["pbnot", "not-condition"],
+    "description": "Negate a condition",
+    "body": [
+      "not:",
+      "  ${1:field}: ${2:value}"
+    ]
+  },
+  "In List Condition": {
+    "prefix": ["pbin", "in-list"],
+    "description": "Match if value is in list",
+    "body": [
+      "${1:field}:",
+      "  in:",
+      "    - ${2:value1}",
+      "    - ${3:value2}"
+    ]
+  },
+  "Regex Match Condition": {
+    "prefix": ["pbregex", "regex-match"],
+    "description": "Match using regex pattern",
+    "body": [
+      "${1:field}:",
+      "  matches: \"${2:pattern}\""
+    ]
+  },
+  "Deny PII to External Models": {
+    "prefix": ["pb-deny-pii-external", "deny-pii-external"],
+    "description": "Common pattern: Deny PII data to external models",
+    "body": [
+      "- name: deny-pii-to-external",
+      "  description: Block requests with PII from going to external AI providers",
+      "  priority: 100",
+      "  enabled: true",
+      "  match_conditions:",
+      "    data_classification:",
+      "      contains: pii",
+      "    provider:",
+      "      not_in:",
+      "        - internal",
+      "  action: DENY",
+      "  action_params:",
+      "    reason: PII data cannot be sent to external AI providers",
+      "$0"
+    ]
+  },
+  "Restrict GPT-4 to Engineering": {
+    "prefix": ["pb-gpt4-engineering", "gpt4-engineering-only"],
+    "description": "Common pattern: Restrict GPT-4 to engineering department",
+    "body": [
+      "- name: restrict-gpt4-to-engineering",
+      "  description: Only allow engineering department to use GPT-4",
+      "  priority: 90",
+      "  enabled: true",
+      "  match_conditions:",
+      "    model:",
+      "      contains: gpt-4",
+      "    not:",
+      "      department: engineering",
+      "  action: DENY",
+      "  action_params:",
+      "    reason: GPT-4 is restricted to engineering department",
+      "$0"
+    ]
+  },
+  "Business Hours Only": {
+    "prefix": ["pb-business-hours", "business-hours-only"],
+    "description": "Common pattern: Allow AI usage only during business hours",
+    "body": [
+      "- name: business-hours-only",
+      "  description: Restrict AI usage to business hours (9 AM - 6 PM, Mon-Fri)",
+      "  priority: 50",
+      "  enabled: true",
+      "  match_conditions:",
+      "    not:",
+      "      time:",
+      "        day_of_week: [0, 1, 2, 3, 4]",
+      "        hour_start: 9",
+      "        hour_end: 18",
+      "  action: DENY",
+      "  action_params:",
+      "    reason: AI usage is only permitted during business hours",
+      "$0"
+    ]
+  },
+  "Daily Cost Limit": {
+    "prefix": ["pb-cost-limit", "daily-cost-limit"],
+    "description": "Common pattern: Apply daily cost limit",
+    "body": [
+      "- name: daily-cost-limit",
+      "  description: Rate limit to enforce daily cost budget",
+      "  priority: 80",
+      "  enabled: true",
+      "  match_conditions: {}",
+      "  action: RATE_LIMIT",
+      "  action_params:",
+      "    rate_limit:",
+      "      cost_per_day: ${1:100.00}",
+      "      requests_per_day: ${2:1000}",
+      "$0"
+    ]
+  }
+}

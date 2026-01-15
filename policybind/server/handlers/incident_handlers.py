@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from aiohttp import web
 
-from policybind.exceptions import IncidentError, ValidationError
+from policybind.exceptions import IncidentError
 
 logger = logging.getLogger("policybind.server.handlers.incident")
 

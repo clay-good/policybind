@@ -154,7 +154,7 @@ class TestMiddleware:
         from policybind.server.middleware import create_error_handler_middleware
 
         async def handler(request: web.Request) -> web.Response:
-            raise ValidationError("Test error", {"field": "test"})
+            raise ValidationError("Test error", details={"field": "test"})
 
         app = web.Application(middlewares=[create_error_handler_middleware()])
         app.router.add_get("/test", handler)

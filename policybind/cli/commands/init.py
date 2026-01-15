@@ -9,7 +9,6 @@ Usage:
 """
 
 import argparse
-import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -17,7 +16,7 @@ if TYPE_CHECKING:
     from policybind.cli.main import CLIContext
 
 
-def register(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+def register(subparsers: argparse._SubParsersAction) -> None:
     """
     Register the init command with the parser.
 
@@ -65,7 +64,6 @@ def run_init(args: argparse.Namespace, ctx: "CLIContext") -> int:
         Exit code.
     """
     from policybind.cli.main import EXIT_ERROR, EXIT_SUCCESS
-    from policybind.storage.database import Database
 
     target_path = Path(args.path).resolve()
 

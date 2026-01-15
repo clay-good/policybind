@@ -1,0 +1,150 @@
+# PolicyBind Docker Compose Configuration
+#
+# Usage:
+#   docker-compose up              # Start all services
+#   docker-compose up -d           # Start in background
+#   docker-compose up policybind   # Start only PolicyBind server
+#   docker-compose run cli         # Run CLI commands
+#   docker-compose down            # Stop all services
+#
+# Development:
+#   docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  # ===========================================================================
+  # PolicyBind API Server
+  # ===========================================================================
+  policybind:
+    build:
+      context: .
+      target: production
+    image: policybind:latest
+    container_name: policybind-server
+    ports:
+      - "8080:8080"
+    volumes:
+      # Persistent data storage
+      - policybind-data:/app/data
+      # Mount policies directory for hot-reloading
+      - ./examples/policies:/app/policies:ro
+      # Mount custom config
+      - ./configs:/app/configs:ro
+    environment:
+      POLICYBIND_DATABASE_PATH: /app/data/policybind.db
+      POLICYBIND_LOG_LEVEL: INFO
+      POLICYBIND_LOG_FORMAT: json
+      POLICYBIND_ENFORCEMENT_DEFAULT_ACTION: deny
+      POLICYBIND_ENFORCEMENT_LOG_ALL_REQUESTS: "true"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - policybind-network
+
+  # ===========================================================================
+  # PolicyBind CLI
+  # ===========================================================================
+  cli:
+    build:
+      context: .
+      target: production
+    image: policybind:latest
+    container_name: policybind-cli
+    volumes:
+      - policybind-data:/app/data
+      - ./examples/policies:/app/policies:ro
+      - ./configs:/app/configs:ro
+    environment:
+      POLICYBIND_DATABASE_PATH: /app/data/policybind.db
+    entrypoint: ["policybind"]
+    command: ["--help"]
+    profiles:
+      - cli
+    networks:
+      - policybind-network
+
+  # ===========================================================================
+  # Development/Test Runner
+  # ===========================================================================
+  test:
+    build:
+      context: .
+      target: development
+    image: policybind:dev
+    container_name: policybind-test
+    volumes:
+      - .:/app:ro
+      - policybind-test-data:/app/data
+    environment:
+      POLICYBIND_DATABASE_PATH: ":memory:"
+    command: ["pytest", "-v", "--tb=short"]
+    profiles:
+      - test
+    networks:
+      - policybind-network
+
+  # ===========================================================================
+  # Metrics Collection (Optional)
+  # ===========================================================================
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: policybind-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    profiles:
+      - monitoring
+    networks:
+      - policybind-network
+
+  # ===========================================================================
+  # Visualization (Optional)
+  # ===========================================================================
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: policybind-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: policybind
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    profiles:
+      - monitoring
+    depends_on:
+      - prometheus
+    networks:
+      - policybind-network
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  policybind-network:
+    driver: bridge
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  policybind-data:
+    driver: local
+  policybind-test-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local

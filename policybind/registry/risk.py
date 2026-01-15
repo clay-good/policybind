@@ -5,9 +5,10 @@ This module provides the RiskAssessor class for computing risk levels
 based on deployment characteristics and suggesting mitigations.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
 from policybind.models.registry import ModelDeployment, RiskLevel
 

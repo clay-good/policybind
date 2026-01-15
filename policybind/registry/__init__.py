@@ -17,25 +17,6 @@ from policybind.registry.manager import (
     DeploymentEventType,
     RegistryManager,
 )
-from policybind.registry.risk import (
-    RiskAssessment,
-    RiskAssessor,
-    RiskFactor,
-    RiskMitigation,
-)
-from policybind.registry.validator import (
-    DeploymentValidator,
-    DeploymentValidationResult,
-)
-from policybind.registry.workflows import (
-    ApprovalStage,
-    ApprovalWorkflow,
-    ReviewWorkflow,
-    SuspensionWorkflow,
-    WorkflowInstance,
-    WorkflowStatus,
-    WorkflowStep,
-)
 from policybind.registry.notifications import (
     Notification,
     NotificationChannel,
@@ -57,6 +38,25 @@ from policybind.registry.policy_integration import (
     RegistryConditionFactory,
     RegistryEnricher,
     RegistryField,
+)
+from policybind.registry.risk import (
+    RiskAssessment,
+    RiskAssessor,
+    RiskFactor,
+    RiskMitigation,
+)
+from policybind.registry.validator import (
+    DeploymentValidationResult,
+    DeploymentValidator,
+)
+from policybind.registry.workflows import (
+    ApprovalStage,
+    ApprovalWorkflow,
+    ReviewWorkflow,
+    SuspensionWorkflow,
+    WorkflowInstance,
+    WorkflowStatus,
+    WorkflowStep,
 )
 
 __all__ = [

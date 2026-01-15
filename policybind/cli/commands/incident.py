@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from policybind.cli.main import CLIContext
 
 
-def register(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+def register(subparsers: argparse._SubParsersAction) -> None:
     """
     Register the incident command with the parser.
 
@@ -635,10 +635,6 @@ def run_incident_stats(args: argparse.Namespace, ctx: "CLIContext") -> int:
     try:
         manager = _get_incident_manager(ctx)
         metrics = manager.get_metrics()
-
-        # Get critical/high counts from by_severity dict
-        critical_open = metrics.by_severity.get("CRITICAL", 0)
-        high_open = metrics.by_severity.get("HIGH", 0)
 
         result = {
             "total_count": metrics.total_count,

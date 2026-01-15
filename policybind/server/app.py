@@ -17,8 +17,6 @@ Example:
 
 import asyncio
 import logging
-import signal
-import sys
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -92,9 +90,9 @@ class PolicyBindApplication:
         """
         self._config = config or PolicyBindConfig()
         self._server_config = server_config or self._create_server_config()
-        self._app: "web.Application | None" = None
-        self._runner: "web.AppRunner | None" = None
-        self._site: "web.TCPSite | None" = None
+        self._app: web.Application | None = None
+        self._runner: web.AppRunner | None = None
+        self._site: web.TCPSite | None = None
         self._rate_limiter: Any = None
         self._shutdown_event: asyncio.Event | None = None
 
@@ -224,16 +222,14 @@ class PolicyBindApplication:
             app["audit_repository"] = AuditRepository(database)
 
             # Load policies
-            from policybind.engine.parser import PolicyParser
             from policybind.engine.reloader import PolicyReloader
 
-            parser = PolicyParser()
             reloader = PolicyReloader(
-                policies_path=self._config.policies_path,
-                parser=parser,
+                policy_paths=[self._config.policies_path] if self._config.policies_path else None,
             )
+            reloader.reload()  # Initial load
 
-            policy_set = reloader.get_current_policy_set()
+            policy_set = reloader.get_active_policy()
             app["policy_set"] = policy_set
             app["reloader"] = reloader
 
@@ -303,9 +299,9 @@ class PolicyBindApplication:
 
             # Initialize versioning
             try:
-                from policybind.engine.versioning import PolicyVersioning
+                from policybind.engine.versioning import PolicyVersionManager
 
-                versioning = PolicyVersioning(database)
+                versioning = PolicyVersionManager()
                 app["versioning"] = versioning
             except Exception as e:
                 logger.warning(f"Could not initialize versioning: {e}")

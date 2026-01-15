@@ -299,7 +299,7 @@ class TestNotificationManager:
 
         prefs = NotificationPreferences(
             quiet_hours_start=0,
-            quiet_hours_end=23,  # Always quiet
+            quiet_hours_end=24,  # Always quiet (0:00 to 24:00 covers all hours)
             preferred_channel=NotificationChannel.LOG,
         )
         notification_manager.set_preferences("user@example.com", prefs)
@@ -321,7 +321,7 @@ class TestNotificationManager:
         """Test urgent notification bypasses quiet hours."""
         prefs = NotificationPreferences(
             quiet_hours_start=0,
-            quiet_hours_end=23,  # Always quiet
+            quiet_hours_end=24,  # Always quiet (0:00 to 24:00 covers all hours)
             preferred_channel=NotificationChannel.LOG,
         )
         notification_manager.set_preferences("user@example.com", prefs)
@@ -513,10 +513,10 @@ class TestNotificationManager:
         notification_manager: NotificationManager,
     ) -> None:
         """Test getting pending notifications."""
-        # Set up quiet hours for all users
+        # Set up quiet hours for all users (0:00 to 24:00 covers all hours)
         prefs = NotificationPreferences(
             quiet_hours_start=0,
-            quiet_hours_end=23,
+            quiet_hours_end=24,
         )
         notification_manager.set_preferences("user@example.com", prefs)
 

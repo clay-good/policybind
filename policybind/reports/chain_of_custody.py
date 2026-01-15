@@ -15,7 +15,6 @@ import secrets
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
 from typing import Any
 
 from policybind.models.base import generate_uuid, utc_now
@@ -639,7 +638,6 @@ class IntegrityManager:
         chain_dict = tamper_evident.get("custody_chain", {})
 
         # Verify package integrity
-        package_checksum = package_dict.get("manifest_checksum", "")
         items = package_dict.get("items", [])
 
         # Reconstruct items to verify checksums

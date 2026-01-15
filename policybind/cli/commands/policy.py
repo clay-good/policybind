@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from policybind.cli.main import CLIContext
 
 
-def register(subparsers: argparse._SubParsersAction) -> None:  # type: ignore[type-arg]
+def register(subparsers: argparse._SubParsersAction) -> None:
     """
     Register the policy command with the parser.
 
@@ -717,7 +717,7 @@ def run_policy_rollback(args: argparse.Namespace, ctx: "CLIContext") -> int:
         # Parse policy
         policy_set = PolicySet.from_dict(policy_data["content"])
 
-        ctx.print(f"Policy to restore:")
+        ctx.print("Policy to restore:")
         ctx.print(f"  ID: {policy_data['id']}")
         ctx.print(f"  Name: {policy_set.name}")
         ctx.print(f"  Version: {policy_set.version}")

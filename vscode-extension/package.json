@@ -1,0 +1,211 @@
+{
+  "name": "policybind",
+  "displayName": "PolicyBind - AI Policy Editor",
+  "description": "Language support, validation, and IntelliSense for PolicyBind AI governance policy files",
+  "version": "0.1.0",
+  "publisher": "policybind",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/clay-good/policybind"
+  },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters",
+    "Snippets",
+    "Other"
+  ],
+  "keywords": [
+    "policybind",
+    "ai",
+    "governance",
+    "policy",
+    "yaml",
+    "llm",
+    "openai",
+    "anthropic"
+  ],
+  "activationEvents": [
+    "onLanguage:yaml",
+    "workspaceContains:**/*.policy.yaml",
+    "workspaceContains:**/*.policy.yml",
+    "workspaceContains:**/policies/*.yaml",
+    "workspaceContains:**/policies/*.yml"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "policybind-yaml",
+        "aliases": [
+          "PolicyBind Policy",
+          "policybind"
+        ],
+        "extensions": [
+          ".policy.yaml",
+          ".policy.yml"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "policybind-yaml",
+        "scopeName": "source.yaml.policybind",
+        "path": "./syntaxes/policybind.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "policybind-yaml",
+        "path": "./snippets/policybind.json"
+      },
+      {
+        "language": "yaml",
+        "path": "./snippets/policybind.json"
+      }
+    ],
+    "configuration": {
+      "title": "PolicyBind",
+      "properties": {
+        "policybind.validation.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable PolicyBind policy validation"
+        },
+        "policybind.validation.onSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Validate policy files on save"
+        },
+        "policybind.validation.onType": {
+          "type": "boolean",
+          "default": true,
+          "description": "Validate policy files while typing"
+        },
+        "policybind.hover.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable hover information for policy keywords"
+        },
+        "policybind.completion.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable IntelliSense completions"
+        },
+        "policybind.filePatterns": {
+          "type": "array",
+          "default": [
+            "**/*.policy.yaml",
+            "**/*.policy.yml",
+            "**/policies/*.yaml",
+            "**/policies/*.yml"
+          ],
+          "description": "File patterns to recognize as PolicyBind policy files"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "policybind.validateFile",
+        "title": "Validate Policy File",
+        "category": "PolicyBind"
+      },
+      {
+        "command": "policybind.validateWorkspace",
+        "title": "Validate All Policies in Workspace",
+        "category": "PolicyBind"
+      },
+      {
+        "command": "policybind.createPolicySet",
+        "title": "Create New Policy Set",
+        "category": "PolicyBind"
+      },
+      {
+        "command": "policybind.createRule",
+        "title": "Create New Policy Rule",
+        "category": "PolicyBind"
+      },
+      {
+        "command": "policybind.formatDocument",
+        "title": "Format Policy Document",
+        "category": "PolicyBind"
+      },
+      {
+        "command": "policybind.showDocumentation",
+        "title": "Show PolicyBind Documentation",
+        "category": "PolicyBind"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "policybind.validateFile",
+          "when": "resourceExtname == .yaml || resourceExtname == .yml",
+          "group": "policybind"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "policybind.createPolicySet",
+          "when": "explorerResourceIsFolder",
+          "group": "policybind"
+        }
+      ]
+    },
+    "jsonValidation": [
+      {
+        "fileMatch": [
+          "*.policy.yaml",
+          "*.policy.yml",
+          "policies/*.yaml",
+          "policies/*.yml"
+        ],
+        "url": "./schemas/policybind-policy.schema.json"
+      }
+    ],
+    "yamlValidation": [
+      {
+        "fileMatch": [
+          "*.policy.yaml",
+          "*.policy.yml",
+          "policies/*.yaml",
+          "policies/*.yml"
+        ],
+        "url": "./schemas/policybind-policy.schema.json"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package",
+    "publish": "vsce publish"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "@vscode/test-electron": "^2.3.8",
+    "@vscode/vsce": "^2.22.0",
+    "eslint": "^8.55.0",
+    "glob": "^10.3.10",
+    "mocha": "^10.2.0",
+    "typescript": "^5.3.2"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "ajv": "^8.12.0",
+    "vscode-languageclient": "^9.0.1"
+  }
+}

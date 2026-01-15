@@ -7,15 +7,15 @@ and reloading them without restarting the service.
 
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from policybind.engine.parser import PolicyParser
 from policybind.engine.validator import PolicyValidator, ValidationResult
 from policybind.engine.versioning import PolicyVersion, PolicyVersionManager
-from policybind.exceptions import PolicyError
 from policybind.models.base import generate_uuid, utc_now
 from policybind.models.policy import PolicySet
 
